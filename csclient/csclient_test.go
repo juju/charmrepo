@@ -24,15 +24,15 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmstore.v4"
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v0/bakerytest"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 	"gopkg.in/mgo.v2"
-	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 
-	"gopkg.in/juju/charmstore.v4"
 	"gopkg.in/juju/charmrepo.v0/csclient"
 	"gopkg.in/juju/charmrepo.v0/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
@@ -187,10 +187,8 @@ var getTests = []struct {
 
 func (s *suite) TestGet(c *gc.C) {
 	ch := charmRepo.CharmDir("wordpress")
-	err := s.client.UploadCharmWithRevision(
-		charm.MustParseReference("~charmers/utopic/wordpress-42"),
-		ch,
-		42)
+	url := charm.MustParseReference("~charmers/utopic/wordpress-42")
+	err := s.client.UploadCharmWithRevision(url, ch, 42)
 	c.Assert(err, gc.IsNil)
 
 	for i, test := range getTests {
@@ -285,16 +283,6 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 	c.Assert(got, jc.DeepEquals, perms)
 }
 
-func (s *suite) statsForKey(c *gc.C, key string) int {
-	var result []struct {
-		Count int
-	}
-	err := s.client.Get("/stats/counter/"+key, &result)
-	c.Assert(err, gc.IsNil)
-	c.Assert(result, gc.HasLen, 1)
-	return result[0].Count
-}
-
 func (s *suite) TestGetArchive(c *gc.C) {
 	key := s.checkGetArchive(c)
 
@@ -315,15 +303,11 @@ var checkDownloadsAttempt = utils.AttemptStrategy{
 	Delay: 100 * time.Millisecond,
 }
 
-func (s *suite) checkCharmDownloads(c *gc.C, key string, expect int) {
+func (s *suite) checkCharmDownloads(c *gc.C, key string, expect int64) {
 	stableCount := 0
 	for a := checkDownloadsAttempt.Start(); a.Next(); {
-		var result []params.Statistic
-		err := s.client.Get("/stats/counter/"+key, &result)
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(result, gc.HasLen, 1)
-		count := result[0].Count
-		if count == int64(expect) {
+		count := s.statsForKey(c, key)
+		if count == expect {
 			// Wait for a couple of iterations to make sure that it's stable.
 			if stableCount++; stableCount >= 2 {
 				return
@@ -335,6 +319,14 @@ func (s *suite) checkCharmDownloads(c *gc.C, key string, expect int) {
 			c.Errorf("unexpected download count for %s, got %d, want %d", key, count, expect)
 		}
 	}
+}
+
+func (s *suite) statsForKey(c *gc.C, key string) int64 {
+	var result []params.Statistic
+	err := s.client.Get("/stats/counter/"+key, &result)
+	c.Assert(err, gc.IsNil)
+	c.Assert(result, gc.HasLen, 1)
+	return result[0].Count
 }
 
 func (s *suite) checkGetArchive(c *gc.C) string {
@@ -946,6 +938,7 @@ func (s *suite) TestDo(c *gc.C) {
 		charmRepo.CharmArchive(c.MkDir(), "wordpress"),
 		42,
 	)
+	c.Assert(err, gc.IsNil)
 	err = s.client.PutExtraInfo(url, map[string]interface{}{
 		"foo": "bar",
 	})
