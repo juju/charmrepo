@@ -17,8 +17,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/yaml.v1"
 
-	"gopkg.in/juju/charm.v5"
-	"gopkg.in/juju/charm.v5/charmrepo"
+	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v0"
 )
 
 var _ = gc.Suite(&migrateSuite{})

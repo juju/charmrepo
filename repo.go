@@ -10,7 +10,7 @@ import (
 
 	"github.com/juju/loggo"
 
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 )
 
 var logger = loggo.GetLogger("juju.charm.charmrepo")

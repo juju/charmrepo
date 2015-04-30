@@ -15,10 +15,10 @@ import (
 
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charmstore.v4/csclient"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmrepo.v0/csclient"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 )
 
 // CacheDir stores the charm cache directory path.
