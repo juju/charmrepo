@@ -18,11 +18,11 @@ import (
 	"unicode"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v5"
+	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
 	"gopkg.in/macaroon.v1"
 
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
 
 const apiVersion = "v4"

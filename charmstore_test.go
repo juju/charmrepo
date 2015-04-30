@@ -21,13 +21,12 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charmstore.v4"
-	"gopkg.in/juju/charmstore.v4/charmstoretesting"
-	"gopkg.in/juju/charmstore.v4/csclient"
-	"gopkg.in/juju/charmstore.v4/params"
+	"gopkg.in/juju/charmrepo.v0/csclient"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 
-	"gopkg.in/juju/charm.v5"
-	"gopkg.in/juju/charm.v5/charmrepo"
-	charmtesting "gopkg.in/juju/charm.v5/testing"
+	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charmrepo.v0"
+	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 )
 
 type charmStoreSuite struct {
@@ -48,24 +47,21 @@ func (s *charmStoreSuite) TestDefaultURL(c *gc.C) {
 	c.Assert(repo.(*charmrepo.CharmStore).URL(), gc.Equals, csclient.ServerURL)
 }
 
-var serverParams = charmstore.ServerParams{
-	AuthUsername: "test-user",
-	AuthPassword: "test-password",
-}
-
 type charmStoreBaseSuite struct {
 	charmtesting.IsolatedMgoSuite
-	srv  *charmstoretesting.Server
-	repo charmrepo.Interface
+	srv     *httptest.Server
+	client  *csclient.Client
+	handler http.Handler
+	repo    charmrepo.Interface
 }
 
 var _ = gc.Suite(&charmStoreBaseSuite{})
 
 func (s *charmStoreBaseSuite) SetUpTest(c *gc.C) {
 	s.IsolatedMgoSuite.SetUpTest(c)
-	s.srv = charmstoretesting.OpenServer(c, s.Session, serverParams)
+	s.startServer(c)
 	s.repo = charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
-		URL: s.srv.URL(),
+		URL: s.srv.URL,
 	})
 	s.PatchValue(&charmrepo.CacheDir, c.MkDir())
 }
@@ -75,18 +71,39 @@ func (s *charmStoreBaseSuite) TearDownTest(c *gc.C) {
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
+func (s *charmStoreBaseSuite) startServer(c *gc.C) {
+	serverParams := charmstore.ServerParams{
+		AuthUsername: "test-user",
+		AuthPassword: "test-password",
+	}
+
+	db := s.Session.DB("charmstore")
+	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V4)
+	c.Assert(err, gc.IsNil)
+	s.handler = handler
+	s.srv = httptest.NewServer(handler)
+	s.client = csclient.New(csclient.Params{
+		URL:      s.srv.URL,
+		User:     serverParams.AuthUsername,
+		Password: serverParams.AuthPassword,
+	})
+}
+
 // addCharm uploads a charm to the testing charm store, and returns the
 // resulting charm and charm URL.
-func (s *charmStoreBaseSuite) addCharm(c *gc.C, url, name string) (charm.Charm, *charm.URL) {
-	id := charm.MustParseReference(url)
-	promulgated := false
+func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
+	id := charm.MustParseReference(urlStr)
+	promulgatedRevision := -1
 	if id.User == "" {
 		id.User = "who"
-		promulgated = true
+		promulgatedRevision = id.Revision
 	}
 	ch := TestCharms.CharmArchive(c.MkDir(), name)
-	id = s.srv.UploadCharm(c, ch, id, promulgated)
-	return ch, (*charm.URL)(id)
+	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
+	c.Assert(err, gc.IsNil)
+	url, err := id.URL("")
+	c.Assert(err, gc.IsNil)
+	return ch, url
 }
 
 type charmStoreRepoSuite struct {
@@ -98,17 +115,13 @@ var _ = gc.Suite(&charmStoreRepoSuite{})
 // checkCharmDownloads checks that the charm represented by the given URL has
 // been downloaded the expected number of times.
 func (s *charmStoreRepoSuite) checkCharmDownloads(c *gc.C, url *charm.URL, expect int) {
-	client := csclient.New(csclient.Params{
-		URL: s.srv.URL(),
-	})
-
 	key := []string{params.StatsArchiveDownload, url.Series, url.Name, url.User, strconv.Itoa(url.Revision)}
 	path := "/stats/counter/" + strings.Join(key, ":")
 	var count int
 
 	getDownloads := func() int {
 		var result []params.Statistic
-		err := client.Get(path, &result)
+		err := s.client.Get(path, &result)
 		c.Assert(err, jc.ErrorIsNil)
 		return int(result[0].Count)
 	}
@@ -127,7 +140,7 @@ func (s *charmStoreRepoSuite) checkCharmDownloads(c *gc.C, url *charm.URL, expec
 }
 
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
-	expect, url := s.addCharm(c, "~who/trusty/mysql-0", "mysql")
+	expect, url := s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
 	ch, err := s.repo.Get(url)
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect)
@@ -246,7 +259,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 	var header http.Header
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		header = r.Header
-		s.srv.Handler().ServeHTTP(w, r)
+		s.handler.ServeHTTP(w, r)
 	}))
 	defer srv.Close()
 
@@ -323,7 +336,7 @@ func (s *charmStoreRepoSuite) TestGetErrorHashMismatch(c *gc.C) {
 	// Set up a proxy server that modifies the returned hash.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		rec := httptest.NewRecorder()
-		s.srv.Handler().ServeHTTP(rec, r)
+		s.handler.ServeHTTP(rec, r)
 		w.Header().Set(params.EntityIdHeader, rec.Header().Get(params.EntityIdHeader))
 		w.Header().Set(params.ContentHashHeader, "invalid")
 		w.Write(rec.Body.Bytes())
