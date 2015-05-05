@@ -120,7 +120,7 @@ var migrateTests = []struct {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
 					Charm:    "cs:precise/wordpress-20",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 					Options: map[string]interface{}{
 						"debug":      "no",
 						"engine":     "nginx",
@@ -134,7 +134,7 @@ var migrateTests = []struct {
 				},
 				"mysql": {
 					Charm:    "cs:precise/mysql-28",
-					NumUnits: 2,
+					NumUnits: newInt(2),
 					Options: map[string]interface{}{
 						"binlog-format":    "MIXED",
 						"block-size":       5,
@@ -153,7 +153,7 @@ var migrateTests = []struct {
 		},
 	},
 }, {
-	about: "missing num_units interpreted as single unit",
+	about: "missing num_units interpreted left empty",
 	bundles: `
 		|wordpress-simple:
 		|    services:
@@ -164,8 +164,7 @@ var migrateTests = []struct {
 		"wordpress-simple": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm:    "cs:precise/wordpress-20",
-					NumUnits: 1,
+					Charm: "cs:precise/wordpress-20",
 				},
 			},
 		},
@@ -181,8 +180,7 @@ var migrateTests = []struct {
 		"wordpress-simple": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm:    "wordpress",
-					NumUnits: 1,
+					Charm: "wordpress",
 				},
 			},
 		},
@@ -205,34 +203,34 @@ var migrateTests = []struct {
 		|            num_units: 1
 		|            to: kvm:mysql
 		|        mysql:
-		|	    num_units: 1
+		|            num_units: 1
 		|`,
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress1": {
 					Charm:    "wordpress1",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 					To:       []string{"0"},
 				},
 				"wordpress2": {
 					Charm:    "wordpress2",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 					To:       []string{"kvm:0"},
 				},
 				"wordpress3": {
 					Charm:    "wordpress3",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 					To:       []string{"mysql"},
 				},
 				"wordpress4": {
 					Charm:    "wordpress4",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 					To:       []string{"kvm:mysql"},
 				},
 				"mysql": {
 					Charm:    "mysql",
-					NumUnits: 1,
+					NumUnits: newInt(1),
 				},
 			},
 			Machines: map[string]*charm.MachineSpec{
@@ -252,9 +250,8 @@ var migrateTests = []struct {
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm:    "wordpress",
-					NumUnits: 1,
-					To:       []string{"kvm:0"},
+					Charm: "wordpress",
+					To:    []string{"kvm:0"},
 				},
 			},
 			Machines: map[string]*charm.MachineSpec{
@@ -295,28 +292,24 @@ var migrateTests = []struct {
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm:    "precise/wordpress",
-					NumUnits: 1,
+					Charm: "precise/wordpress",
 					Annotations: map[string]string{
 						"foo":  "yes",
 						"base": "arble",
 					},
 				},
 				"logging": {
-					Charm:    "precise/logging",
-					NumUnits: 1,
+					Charm: "precise/logging",
 				},
 			},
 		},
 		"base": {
 			Services: map[string]*charm.ServiceSpec{
 				"logging": {
-					Charm:    "precise/logging",
-					NumUnits: 1,
+					Charm: "precise/logging",
 				},
 				"wordpress": {
-					Charm:    "wordpress",
-					NumUnits: 1,
+					Charm: "wordpress",
 					Annotations: map[string]string{
 						"foo":  "bar",
 						"base": "arble",
@@ -347,20 +340,16 @@ var migrateTests = []struct {
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm:    "precise/wordpress",
-					NumUnits: 1,
+					Charm: "precise/wordpress",
 				},
 				"mysql": {
-					Charm:    "precise/mysql",
-					NumUnits: 1,
+					Charm: "precise/mysql",
 				},
 				"logging": {
-					Charm:    "precise/logging",
-					NumUnits: 1,
+					Charm: "precise/logging",
 				},
 				"monitoring": {
-					Charm:    "precise/monitor",
-					NumUnits: 1,
+					Charm: "precise/monitor",
 				},
 			},
 			Relations: [][]string{
@@ -870,4 +859,8 @@ func (c *charmData) Actions() *charm.Actions {
 
 func (c *charmData) Revision() int {
 	return 0
+}
+
+func newInt(i int) *int {
+	return &i
 }

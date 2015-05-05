@@ -95,16 +95,13 @@ func migrate(b *legacyBundle) (*charm.BundleData, error) {
 		}
 		newSvc := &charm.ServiceSpec{
 			Charm:       svc.Charm,
-			NumUnits:    1, // default
+			NumUnits:    svc.NumUnits,
 			Options:     svc.Options,
 			Annotations: svc.Annotations,
 			Constraints: svc.Constraints,
 		}
 		if newSvc.Charm == "" {
 			newSvc.Charm = name
-		}
-		if svc.NumUnits != nil {
-			newSvc.NumUnits = *svc.NumUnits
 		}
 		if svc.To != "" {
 			newSvc.To = []string{svc.To}
