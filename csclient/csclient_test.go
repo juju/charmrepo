@@ -28,6 +28,7 @@ import (
 	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v0/bakerytest"
 	"gopkg.in/macaroon-bakery.v0/httpbakery"
+	httpbakery1 "gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmrepo.v0/csclient"
@@ -465,15 +466,7 @@ func (s *suite) TestGetArchiveWithBadResponse(c *gc.C) {
 	id := charm.MustParseReference("wordpress")
 	for i, test := range getArchiveWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
-		cl := csclient.New(csclient.Params{
-			URL: "http://0.1.2.3",
-			HTTPClient: &http.Client{
-				Transport: &cannedRoundTripper{
-					resp:  test.response,
-					error: test.error,
-				},
-			},
-		})
+		cl := badResponseClient(test.response, test.error)
 		_, _, _, _, err := cl.GetArchive(id)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
@@ -544,16 +537,7 @@ func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
 	id := charm.MustParseReference("trusty/wordpress")
 	for i, test := range uploadArchiveWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
-		cl := csclient.New(csclient.Params{
-			URL:  "http://0.1.2.3",
-			User: "bob",
-			HTTPClient: &http.Client{
-				Transport: &cannedRoundTripper{
-					resp:  test.response,
-					error: test.error,
-				},
-			},
-		})
+		cl := badResponseClient(test.response, test.error)
 		id, err := csclient.UploadArchive(cl, id, fakeReader, fakeHash, fakeSize, -1)
 		c.Assert(id, gc.IsNil)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
@@ -883,19 +867,24 @@ var getWithBadResponseTests = []struct {
 func (s *suite) TestGetWithBadResponse(c *gc.C) {
 	for i, test := range getWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
-		cl := csclient.New(csclient.Params{
-			URL: "http://0.1.2.3",
-			HTTPClient: &http.Client{
-				Transport: &cannedRoundTripper{
-					resp:  test.response,
-					error: test.error,
-				},
-			},
-		})
+		cl := badResponseClient(test.response, test.error)
 		var result interface{}
 		err := cl.Get("/foo", &result)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
+}
+
+func badResponseClient(resp *http.Response, err error) *csclient.Client {
+	client := httpbakery.NewHTTPClient()
+	client.Transport = &cannedRoundTripper{
+		resp:  resp,
+		error: err,
+	}
+	return csclient.New(csclient.Params{
+		URL:        "http://0.1.2.3",
+		User:       "bob",
+		HTTPClient: client,
+	})
 }
 
 var hyphenateTests = []struct {
@@ -1220,7 +1209,7 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 	// TODO 2015-01-23: once supported, rewrite the test using POST requests.
 	_, err = client.Meta(purl, &result)
 	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
-	c.Assert(httpbakery.IsDischargeError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(httpbakery1.IsDischargeError(errgo.Cause(err)), gc.Equals, true)
 
 	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
 		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
@@ -1250,7 +1239,7 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 	_, err = client.Meta(purl, &result)
 	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": cannot start interactive session: stopping interaction`)
 	c.Assert(result.IdRevision.Revision, gc.Equals, curl.Revision)
-	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(httpbakery1.IsInteractionError(errgo.Cause(err)), gc.Equals, true)
 }
 
 func (s *suite) TestLogin(c *gc.C) {

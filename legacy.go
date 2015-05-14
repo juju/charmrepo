@@ -17,7 +17,6 @@ import (
 	"strings"
 
 	"github.com/juju/utils"
-
 	"gopkg.in/juju/charm.v6-unstable"
 )
 

@@ -19,7 +19,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
 	"gopkg.in/juju/charmrepo.v0/csclient/params"
@@ -37,6 +37,7 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 // Client represents the client side of a charm store.
 type Client struct {
 	params        Params
+	bclient       *httpbakery.Client
 	header        http.Header
 	statsDisabled bool
 }
@@ -62,7 +63,7 @@ type Params struct {
 
 	// VisitWebPage is called when authorization requires that
 	// the user visits a web page to authenticate themselves.
-	// If nil, a default function that returns ErrNoInteraction will be used.
+	// If nil, no interaction will be allowed.
 	VisitWebPage func(url *url.URL) error
 }
 
@@ -71,23 +72,16 @@ func New(p Params) *Client {
 	if p.URL == "" {
 		p.URL = ServerURL
 	}
-	if p.VisitWebPage == nil {
-		p.VisitWebPage = noVisit
-	}
 	if p.HTTPClient == nil {
 		p.HTTPClient = httpbakery.NewHTTPClient()
 	}
 	return &Client{
 		params: p,
+		bclient: &httpbakery.Client{
+			Client:       p.HTTPClient,
+			VisitWebPage: p.VisitWebPage,
+		},
 	}
-}
-
-// ErrNoInteraction is the error cause returned by the default Params.VisitWebPage
-// value when it is nil.
-var ErrNoInteraction = errgo.New("interaction required but no web browser configured")
-
-func noVisit(url *url.URL) error {
-	return ErrNoInteraction
 }
 
 // ServerURL returns the charm store URL used by the client.
@@ -290,7 +284,7 @@ func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash str
 	resp, err := c.DoWithBody(
 		req,
 		"/"+id.Path()+"/archive?hash="+hash+promulgatedArg,
-		httpbakery.SeekerBody(body),
+		body,
 	)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot post archive", errgo.Any)
@@ -473,7 +467,7 @@ func (c *Client) Put(path string, val interface{}) error {
 		return errgo.Notef(err, "cannot marshal PUT body")
 	}
 	body := bytes.NewReader(data)
-	resp, err := c.DoWithBody(req, path, httpbakery.SeekerBody(body))
+	resp, err := c.DoWithBody(req, path, body)
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
@@ -496,13 +490,12 @@ func parseResponseBody(body io.Reader, result interface{}) error {
 	return nil
 }
 
-// DoWithBody is like Do except that the given getBody function is
-// called to obtain the body for the HTTP request. Any body returned
-// by getBody will be closed before DoWithBody returns.
+// DoWithBody is like Do except that the given body is used
+// as the body of the HTTP request.
 //
 // Any error returned from the underlying httpbakery.DoWithBody
 // request will have an unchanged error cause.
-func (c *Client) DoWithBody(req *http.Request, path string, getBody httpbakery.BodyGetter) (*http.Response, error) {
+func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) (*http.Response, error) {
 	if c.params.User != "" {
 		userPass := c.params.User + ":" + c.params.Password
 		authBasic := base64.StdEncoding.EncodeToString([]byte(userPass))
@@ -523,7 +516,7 @@ func (c *Client) DoWithBody(req *http.Request, path string, getBody httpbakery.B
 	req.URL = u
 
 	// Send the request.
-	resp, err := httpbakery.DoWithBody(c.params.HTTPClient, req, getBody, c.params.VisitWebPage)
+	resp, err := c.bclient.DoWithBody(req, body)
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
@@ -564,11 +557,7 @@ func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
 	if req.Body != nil {
 		return nil, errgo.New("body unexpectedly provided in http request - use DoWithBody")
 	}
-	return c.DoWithBody(req, path, noBody)
-}
-
-func noBody() (io.ReadCloser, error) {
-	return nil, nil
+	return c.DoWithBody(req, path, nil)
 }
 
 func sizeLimit(data []byte) []byte {
@@ -605,8 +594,7 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 		return errgo.Notef(err, "cannot create log request")
 	}
 	req.Header.Set("Content-Type", "application/json")
-	body := bytes.NewReader(b)
-	resp, err := cs.DoWithBody(req, "/log", httpbakery.SeekerBody(body))
+	resp, err := cs.DoWithBody(req, "/log", bytes.NewReader(b))
 	if err != nil {
 		return errgo.NoteMask(err, "cannot send log message", errgo.Any)
 	}
@@ -622,7 +610,7 @@ func (cs *Client) Login() error {
 	if err := cs.Get("/macaroon", &m); err != nil {
 		return errgo.Notef(err, "cannot retrieve the authentication macaroon")
 	}
-	ms, err := httpbakery.DischargeAll(&m, cs.params.HTTPClient, cs.params.VisitWebPage)
+	ms, err := cs.bclient.DischargeAll(&m)
 	if err != nil {
 		return errgo.Notef(err, "cannot discharge login macaroon")
 	}
@@ -630,7 +618,7 @@ func (cs *Client) Login() error {
 	if err != nil {
 		return errgo.Mask(err)
 	}
-	if err := httpbakery.SetCookie(cs.params.HTTPClient.Jar, u, ms); err != nil {
+	if err := httpbakery.SetCookie(cs.bclient.Client.Jar, u, ms); err != nil {
 		return errgo.Notef(err, "cannot set cookie")
 	}
 	return nil

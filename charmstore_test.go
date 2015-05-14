@@ -20,12 +20,12 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v0/csclient"
-	"gopkg.in/juju/charmrepo.v0/csclient/params"
+	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmstore.v4"
 
-	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmrepo.v0"
+	"gopkg.in/juju/charmrepo.v0/csclient"
+	"gopkg.in/juju/charmrepo.v0/csclient/params"
 	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 )
 
