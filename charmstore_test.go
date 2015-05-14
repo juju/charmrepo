@@ -367,8 +367,14 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
 	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
 	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
+	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
 
-	// Calculate and store the expected hashes for re uploaded charms.
+	// Change permissions on one of the charms so that it is not readable by
+	// anyone.
+	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Calculate and store the expected hashes for the uploaded charms.
 	mysqlHash := hashOfCharm(c, "mysql")
 	wordpressHash := hashOfCharm(c, "wordpress")
 	riakHash := hashOfCharm(c, "riak")
@@ -422,6 +428,18 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 		}, {
 			Revision: 3,
 			Sha256:   riakHash,
+		}},
+	}, {
+		about: "unauthorized",
+		urls: []*charm.URL{
+			charm.MustParseURL("cs:~who/precise/wordpress"),
+			url,
+		},
+		revs: []charmrepo.CharmRevision{{
+			Revision: 1,
+			Sha256:   wordpressHash,
+		}, {
+			Err: charmrepo.CharmNotFound("cs:~who/utopic/varnish"),
 		}},
 	}}
 
