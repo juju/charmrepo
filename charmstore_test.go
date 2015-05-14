@@ -99,8 +99,16 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 		promulgatedRevision = id.Revision
 	}
 	ch := TestCharms.CharmArchive(c.MkDir(), name)
+
+	// Upload the charm.
 	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Return the charm and its URL.
 	url, err := id.URL("")
 	c.Assert(err, gc.IsNil)
 	return ch, url
