@@ -6,10 +6,10 @@ package charmrepo_test
 import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charmrepo.v0/csclient"
-
 	"gopkg.in/juju/charm.v6-unstable"
+
 	"gopkg.in/juju/charmrepo.v0"
+	"gopkg.in/juju/charmrepo.v0/csclient"
 	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 )
 

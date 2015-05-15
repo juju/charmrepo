@@ -2,9 +2,8 @@ package migratebundle
 
 import (
 	"gopkg.in/errgo.v1"
-	"gopkg.in/yaml.v1"
-
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/yaml.v1"
 )
 
 // legacyBundle represents an old-style bundle.

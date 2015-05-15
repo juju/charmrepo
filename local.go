@@ -11,7 +11,6 @@ import (
 	"strings"
 
 	"gopkg.in/errgo.v1"
-
 	"gopkg.in/juju/charm.v6-unstable"
 )
 

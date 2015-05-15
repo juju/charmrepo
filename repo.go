@@ -9,7 +9,6 @@ import (
 	"fmt"
 
 	"github.com/juju/loggo"
-
 	"gopkg.in/juju/charm.v6-unstable"
 )
 

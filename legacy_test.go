@@ -12,8 +12,8 @@ import (
 	gitjujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
-
 	"gopkg.in/juju/charm.v6-unstable"
+
 	"gopkg.in/juju/charmrepo.v0"
 	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
 )
