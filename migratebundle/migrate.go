@@ -57,10 +57,8 @@ type legacyService struct {
 // - A relation clause with multiple targets is expanded
 // into multiple relation clauses.
 //
-// The getCharm argument is ignored and provided for
-// backward compatibility only. It will be removed in
-// charm.v5.
-func Migrate(bundlesYAML []byte, getCharm func(id *charm.Reference) (*charm.Meta, error)) (map[string]*charm.BundleData, error) {
+// The isSubord argument is used to find out whether a charm is a subordinate.
+func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.Reference) (bool, error)) (map[string]*charm.BundleData, error) {
 	var bundles map[string]*legacyBundle
 	if err := yaml.Unmarshal(bundlesYAML, &bundles); err != nil {
 		return nil, errgo.Notef(err, "cannot parse legacy bundle")
@@ -72,7 +70,7 @@ func Migrate(bundlesYAML []byte, getCharm func(id *charm.Reference) (*charm.Meta
 		if err != nil {
 			return nil, errgo.Notef(err, "bundle inheritance failed for %q", name)
 		}
-		newBundle, err := migrate(bundle)
+		newBundle, err := migrate(bundle, isSubordinate)
 		if err != nil {
 			return nil, errgo.Notef(err, "bundle migration failed for %q", name)
 		}
@@ -81,7 +79,7 @@ func Migrate(bundlesYAML []byte, getCharm func(id *charm.Reference) (*charm.Meta
 	return newBundles, nil
 }
 
-func migrate(b *legacyBundle) (*charm.BundleData, error) {
+func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, error)) (*charm.BundleData, error) {
 	data := &charm.BundleData{
 		Services: make(map[string]*charm.ServiceSpec),
 		Series:   b.Series,
@@ -92,15 +90,32 @@ func migrate(b *legacyBundle) (*charm.BundleData, error) {
 		if svc == nil {
 			svc = new(legacyService)
 		}
+		charmId := svc.Charm
+		if charmId == "" {
+			charmId = name
+		}
+		numUnits := 0
+		if svc.NumUnits != nil {
+			numUnits = *svc.NumUnits
+		} else {
+			id, err := charm.ParseReference(charmId)
+			if err != nil {
+				return nil, errgo.Mask(err)
+			}
+			isSub, err := isSubordinate(id)
+			if err != nil {
+				return nil, errgo.Notef(err, "cannot get metadata for bundle charm", id)
+			}
+			if !isSub {
+				numUnits = 1
+			}
+		}
 		newSvc := &charm.ServiceSpec{
-			Charm:       svc.Charm,
-			NumUnits:    svc.NumUnits,
+			Charm:       charmId,
+			NumUnits:    numUnits,
 			Options:     svc.Options,
 			Annotations: svc.Annotations,
 			Constraints: svc.Constraints,
-		}
-		if newSvc.Charm == "" {
-			newSvc.Charm = name
 		}
 		if svc.To != "" {
 			newSvc.To = []string{svc.To}

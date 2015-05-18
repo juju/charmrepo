@@ -24,11 +24,10 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charmstore.v4"
-	"gopkg.in/macaroon-bakery.v0/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v0/bakerytest"
-	"gopkg.in/macaroon-bakery.v0/httpbakery"
-	httpbakery1 "gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/juju/charmstore.v5-unstable"
+	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v1/bakerytest"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmrepo.v0/csclient"
@@ -1209,7 +1208,7 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 	// TODO 2015-01-23: once supported, rewrite the test using POST requests.
 	_, err = client.Meta(purl, &result)
 	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
-	c.Assert(httpbakery1.IsDischargeError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(httpbakery.IsDischargeError(errgo.Cause(err)), gc.Equals, true)
 
 	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
 		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
@@ -1239,7 +1238,7 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 	_, err = client.Meta(purl, &result)
 	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": cannot start interactive session: stopping interaction`)
 	c.Assert(result.IdRevision.Revision, gc.Equals, curl.Revision)
-	c.Assert(httpbakery1.IsInteractionError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), gc.Equals, true)
 }
 
 func (s *suite) TestLogin(c *gc.C) {
