@@ -78,6 +78,7 @@ func (*migrateSuite) TearDownSuite(c *gc.C) {
 var migrateTests = []struct {
 	about       string
 	bundles     string
+	subords     map[string]bool
 	expect      map[string]*charm.BundleData
 	expectError string
 }{{
@@ -120,7 +121,7 @@ var migrateTests = []struct {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
 					Charm:    "cs:precise/wordpress-20",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 					Options: map[string]interface{}{
 						"debug":      "no",
 						"engine":     "nginx",
@@ -134,7 +135,7 @@ var migrateTests = []struct {
 				},
 				"mysql": {
 					Charm:    "cs:precise/mysql-28",
-					NumUnits: newInt(2),
+					NumUnits: 2,
 					Options: map[string]interface{}{
 						"binlog-format":    "MIXED",
 						"block-size":       5,
@@ -153,13 +154,34 @@ var migrateTests = []struct {
 		},
 	},
 }, {
-	about: "missing num_units interpreted left empty",
+	about: "missing num_units interpreted as 1 for non-subordinates",
 	bundles: `
 		|wordpress-simple:
 		|    services:
 		|        wordpress:
 		|            charm: "cs:precise/wordpress-20"
 		|`,
+	expect: map[string]*charm.BundleData{
+		"wordpress-simple": {
+			Services: map[string]*charm.ServiceSpec{
+				"wordpress": {
+					Charm:    "cs:precise/wordpress-20",
+					NumUnits: 1,
+				},
+			},
+		},
+	},
+}, {
+	about: "missing num_units interpreted as 0 for subordinates",
+	bundles: `
+		|wordpress-simple:
+		|    services:
+		|        wordpress:
+		|            charm: "cs:precise/wordpress-20"
+		|`,
+	subords: map[string]bool{
+		"cs:precise/wordpress-20": true,
+	},
 	expect: map[string]*charm.BundleData{
 		"wordpress-simple": {
 			Services: map[string]*charm.ServiceSpec{
@@ -180,7 +202,8 @@ var migrateTests = []struct {
 		"wordpress-simple": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm: "wordpress",
+					Charm:    "wordpress",
+					NumUnits: 1,
 				},
 			},
 		},
@@ -210,27 +233,27 @@ var migrateTests = []struct {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress1": {
 					Charm:    "wordpress1",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 					To:       []string{"0"},
 				},
 				"wordpress2": {
 					Charm:    "wordpress2",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 					To:       []string{"kvm:0"},
 				},
 				"wordpress3": {
 					Charm:    "wordpress3",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 					To:       []string{"mysql"},
 				},
 				"wordpress4": {
 					Charm:    "wordpress4",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 					To:       []string{"kvm:mysql"},
 				},
 				"mysql": {
 					Charm:    "mysql",
-					NumUnits: newInt(1),
+					NumUnits: 1,
 				},
 			},
 			Machines: map[string]*charm.MachineSpec{
@@ -250,8 +273,9 @@ var migrateTests = []struct {
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm: "wordpress",
-					To:    []string{"kvm:0"},
+					Charm:    "wordpress",
+					To:       []string{"kvm:0"},
+					NumUnits: 1,
 				},
 			},
 			Machines: map[string]*charm.MachineSpec{
@@ -288,6 +312,9 @@ var migrateTests = []struct {
 		|                 foo: bar
 		|                 base: arble
 		|`,
+	subords: map[string]bool{
+		"cs:precise/logging": true,
+	},
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
@@ -297,6 +324,7 @@ var migrateTests = []struct {
 						"foo":  "yes",
 						"base": "arble",
 					},
+					NumUnits: 1,
 				},
 				"logging": {
 					Charm: "precise/logging",
@@ -309,7 +337,8 @@ var migrateTests = []struct {
 					Charm: "precise/logging",
 				},
 				"wordpress": {
-					Charm: "wordpress",
+					Charm:    "wordpress",
+					NumUnits: 1,
 					Annotations: map[string]string{
 						"foo":  "bar",
 						"base": "arble",
@@ -336,14 +365,20 @@ var migrateTests = []struct {
 		|        - [logging, [mysql, wordpress]]
 		|        - [monitoring, wordpress]
 		|`,
+	subords: map[string]bool{
+		"cs:precise/logging": true,
+		"cs:precise/monitor": true,
+	},
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm: "precise/wordpress",
+					Charm:    "precise/wordpress",
+					NumUnits: 1,
 				},
 				"mysql": {
-					Charm: "precise/mysql",
+					Charm:    "precise/mysql",
+					NumUnits: 1,
 				},
 				"logging": {
 					Charm: "precise/logging",
@@ -365,7 +400,9 @@ var migrateTests = []struct {
 func (*migrateSuite) TestMigrate(c *gc.C) {
 	for i, test := range migrateTests {
 		c.Logf("test %d: %s", i, test.about)
-		result, err := Migrate(unbeautify(test.bundles), nil)
+		result, err := Migrate(unbeautify(test.bundles), func(id *charm.Reference) (bool, error) {
+			return test.subords[id.String()], nil
+		})
 		if test.expectError != "" {
 			c.Assert(err, gc.ErrorMatches, test.expectError)
 		} else {
@@ -381,7 +418,13 @@ func (*migrateSuite) TestMigrateAll(c *gc.C) {
 	doAllBundles(c, func(c *gc.C, id string, data []byte) {
 		c.Logf("\nmigrate test %s", id)
 		ok := true
-		bundles, err := Migrate(data, nil)
+		bundles, err := Migrate(data, func(id *charm.Reference) (bool, error) {
+			meta, err := getCharm(id)
+			if err != nil {
+				return false, err
+			}
+			return meta.Meta().Subordinate, nil
+		})
 		if err != nil {
 			c.Logf("cannot migrate: %v", err)
 			ok = false
@@ -859,8 +902,4 @@ func (c *charmData) Actions() *charm.Actions {
 
 func (c *charmData) Revision() int {
 	return 0
-}
-
-func newInt(i int) *int {
-	return &i
 }
