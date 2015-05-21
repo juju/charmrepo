@@ -104,7 +104,7 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, err
 			}
 			isSub, err := isSubordinate(id)
 			if err != nil {
-				return nil, errgo.Notef(err, "cannot get metadata for bundle charm", id)
+				return nil, errgo.Notef(err, "cannot get subordinate status for bundle charm %v", id)
 			}
 			if !isSub {
 				numUnits = 1
