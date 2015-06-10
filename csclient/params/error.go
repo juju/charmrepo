@@ -25,10 +25,11 @@ const (
 	ErrForbidden        ErrorCode = "forbidden"
 	ErrBadRequest       ErrorCode = "bad request"
 	// TODO change to ErrAlreadyExists
-	ErrDuplicateUpload  ErrorCode = "duplicate upload"
-	ErrMultipleErrors   ErrorCode = "multiple errors"
-	ErrUnauthorized     ErrorCode = "unauthorized"
-	ErrMethodNotAllowed ErrorCode = "method not allowed"
+	ErrDuplicateUpload    ErrorCode = "duplicate upload"
+	ErrMultipleErrors     ErrorCode = "multiple errors"
+	ErrUnauthorized       ErrorCode = "unauthorized"
+	ErrMethodNotAllowed   ErrorCode = "method not allowed"
+	ErrServiceUnavailable ErrorCode = "service unavailable"
 
 	// Note that these error codes sit in the same name space
 	// as the bakery error codes defined in gopkg.in/macaroon-bakery.v0/httpbakery .
