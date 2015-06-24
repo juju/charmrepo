@@ -51,7 +51,7 @@ type charmStoreBaseSuite struct {
 	charmtesting.IsolatedMgoSuite
 	srv     *httptest.Server
 	client  *csclient.Client
-	handler http.Handler
+	handler charmstore.HTTPCloseHandler
 	repo    charmrepo.Interface
 }
 
@@ -68,6 +68,7 @@ func (s *charmStoreBaseSuite) SetUpTest(c *gc.C) {
 
 func (s *charmStoreBaseSuite) TearDownTest(c *gc.C) {
 	s.srv.Close()
+	s.handler.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 

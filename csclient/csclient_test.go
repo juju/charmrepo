@@ -49,6 +49,7 @@ type suite struct {
 	jujutesting.IsolatedMgoSuite
 	client       *csclient.Client
 	srv          *httptest.Server
+	handler      charmstore.HTTPCloseHandler
 	serverParams charmstore.ServerParams
 	discharge    func(cond, arg string) ([]checkers.Caveat, error)
 }
@@ -67,6 +68,7 @@ func (s *suite) SetUpTest(c *gc.C) {
 
 func (s *suite) TearDownTest(c *gc.C) {
 	s.srv.Close()
+	s.handler.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
@@ -89,6 +91,7 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 	db := session.DB("charmstore")
 	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V4)
 	c.Assert(err, gc.IsNil)
+	s.handler = handler
 	s.srv = httptest.NewServer(handler)
 	s.serverParams = serverParams
 
