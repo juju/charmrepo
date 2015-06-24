@@ -12,7 +12,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
-	"net/url"
+	neturl "net/url"
 	"os"
 	"reflect"
 	"strings"
@@ -1230,7 +1230,7 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 
 	client = csclient.New(csclient.Params{
 		URL: s.srv.URL,
-		VisitWebPage: func(vurl *url.URL) error {
+		VisitWebPage: func(vurl *neturl.URL) error {
 			c.Check(vurl.String(), gc.Equals, visitURL)
 			return fmt.Errorf("stopping interaction")
 		}})
@@ -1250,8 +1250,10 @@ func (s *suite) TestLogin(c *gc.C) {
 
 	err = s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"bob"})
 	c.Assert(err, gc.IsNil)
+	httpClient := httpbakery.NewHTTPClient()
 	client := csclient.New(csclient.Params{
-		URL: s.srv.URL,
+		URL:        s.srv.URL,
+		HTTPClient: httpClient,
 	})
 
 	var result struct{ IdRevision struct{ Revision int } }
@@ -1260,7 +1262,7 @@ func (s *suite) TestLogin(c *gc.C) {
 
 	// Try logging in when the discharger fails.
 	err = client.Login()
-	c.Assert(err, gc.ErrorMatches, `cannot discharge login macaroon: cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
+	c.Assert(err, gc.ErrorMatches, `cannot retrieve the authentication macaroon: cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
 
 	// Allow the discharge.
 	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
@@ -1279,4 +1281,16 @@ func (s *suite) TestLogin(c *gc.C) {
 	_, err = client.Meta(purl, &result)
 	c.Assert(err, gc.IsNil)
 	c.Assert(result.IdRevision.Revision, gc.Equals, url.Revision)
+
+	// Check that we've got one cookie.
+	srvURL, err := neturl.Parse(s.srv.URL)
+	c.Assert(err, gc.IsNil)
+	c.Assert(httpClient.Jar.Cookies(srvURL), gc.HasLen, 1)
+
+	// Log in again.
+	err = client.Login()
+	c.Assert(err, gc.IsNil)
+
+	// Check that we still only have one cookie.
+	c.Assert(httpClient.Jar.Cookies(srvURL), gc.HasLen, 1)
 }
