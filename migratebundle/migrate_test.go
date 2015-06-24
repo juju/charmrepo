@@ -426,7 +426,6 @@ func (*migrateSuite) TestMigrateWithSubordinateStatusError(c *gc.C) {
 	c.Assert(result, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, `bundle migration failed for "wordpress": cannot get subordinate status for bundle charm cs:precise/wordpress: oops`)
 }
-	
 
 func (*migrateSuite) TestMigrateAll(c *gc.C) {
 	c.ExpectFailure("all bundles do not migrate successfully")

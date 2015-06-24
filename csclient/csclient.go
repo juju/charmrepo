@@ -20,7 +20,6 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	"gopkg.in/macaroon.v1"
 
 	"gopkg.in/juju/charmrepo.v0/csclient/params"
 )
@@ -606,20 +605,8 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 // for the charm store and stores them in the client's
 // cookie jar.
 func (cs *Client) Login() error {
-	var m macaroon.Macaroon
-	if err := cs.Get("/macaroon", &m); err != nil {
+	if err := cs.Get("/delegatable-macaroon", &struct{}{}); err != nil {
 		return errgo.Notef(err, "cannot retrieve the authentication macaroon")
-	}
-	ms, err := cs.bclient.DischargeAll(&m)
-	if err != nil {
-		return errgo.Notef(err, "cannot discharge login macaroon")
-	}
-	u, err := url.Parse(cs.ServerURL())
-	if err != nil {
-		return errgo.Mask(err)
-	}
-	if err := httpbakery.SetCookie(cs.bclient.Client.Jar, u, ms); err != nil {
-		return errgo.Notef(err, "cannot set cookie")
 	}
 	return nil
 }
