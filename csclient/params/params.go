@@ -203,6 +203,13 @@ type PromulgateRequest struct {
 	Promulgated bool
 }
 
+// WhoAmIResponse holds the result of a whoami GET request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#whoami
+type WhoAmIResponse struct {
+	User   string
+	Groups []string
+}
+
 const (
 	// BzrDigestKey is the extra-info key used to store the Bazaar digest
 	BzrDigestKey = "bzr-digest"
