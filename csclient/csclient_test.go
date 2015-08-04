@@ -1297,3 +1297,20 @@ func (s *suite) TestLogin(c *gc.C) {
 	// Check that we still only have one cookie.
 	c.Assert(httpClient.Jar.Cookies(srvURL), gc.HasLen, 1)
 }
+
+func (s *suite) TestWhoAmI(c *gc.C) {
+	httpClient := httpbakery.NewHTTPClient()
+	client := csclient.New(csclient.Params{
+		URL:        s.srv.URL,
+		HTTPClient: httpClient,
+	})
+	response, err := client.WhoAmI()
+	c.Assert(err, gc.ErrorMatches, `cannot retrieve whoami response: cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
+	}
+
+	response, err = client.WhoAmI()
+	c.Assert(err, gc.IsNil)
+	c.Assert(response.User, gc.Equals, "bob")
+}

@@ -610,3 +610,13 @@ func (cs *Client) Login() error {
 	}
 	return nil
 }
+
+// WhoAmI returns the user and list of groups associated with the macaroon
+// used to authenticate.
+func (cs *Client) WhoAmI() (*params.WhoAmIResponse, error) {
+	var response params.WhoAmIResponse
+	if err := cs.Get("/whoami", &response); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &response, nil
+}
