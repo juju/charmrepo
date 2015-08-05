@@ -395,6 +395,37 @@ var migrateTests = []struct {
 			},
 		},
 	},
+}, {
+	about: "multiple element to clause",
+	bundles: `
+		|top:
+		|    services:
+		|        wordpress:
+		|            num_units: 3
+		|            charm: 'cs:precise/wordpress'
+		|            to: [0, 'lxc:0', mysql=0, 'lxc:mysql=1']
+		|        mysql:
+		|            num_units: 2
+		|            charm: 'cs:mysql'
+	`,
+	expect: map[string]*charm.BundleData{
+		"top": {
+			Services: map[string]*charm.ServiceSpec{
+				"wordpress": {
+					Charm:    "cs:precise/wordpress",
+					NumUnits: 3,
+					To:       []string{"0", "lxc:0", "mysql/0", "lxc:mysql/1"},
+				},
+				"mysql": {
+					Charm:    "cs:mysql",
+					NumUnits: 2,
+				},
+			},
+			Machines: map[string]*charm.MachineSpec{
+				"0": {},
+			},
+		},
+	},
 }}
 
 func (*migrateSuite) TestMigrate(c *gc.C) {
@@ -501,16 +532,16 @@ var inheritTests = []struct {
 	expectError: `inherited-from bundle "non-existent" not found`,
 }, {
 	about:       "bad inheritance #1",
-	bundle:      `inherits: 200`,
-	expectError: `bad inherits clause 200`,
+	bundle:      `inherits: {}`,
+	expectError: `bad inherits clause: got map\[interface \{\}]interface \{\}\{\}, expected string`,
 }, {
 	about:       "bad inheritance #2",
-	bundle:      `inherits: [10]`,
-	expectError: `bad inherits clause .*`,
+	bundle:      `inherits: [{}]`,
+	expectError: `bad inherits clause: got map\[interface \{\}]interface \{\}\{\}, expected string`,
 }, {
 	about:       "bad inheritance #3",
 	bundle:      `inherits: ['a', 'b']`,
-	expectError: `bad inherits clause .*`,
+	expectError: `multiple inheritance not supported`,
 }, {
 	about: "inherit everything",
 	bundle: `
@@ -734,11 +765,10 @@ func (*migrateSuite) testReversible(c *gc.C, id string, data []byte) {
 		if rels, ok := b["relations"].([]interface{}); ok && len(rels) == 0 {
 			delete(b, "relations")
 		}
-		// Convert all annotation values and "to" values
-		// to strings.
-		// Strictly speaking this means that the bundles
-		// are non-reversible, but juju converts annotations
-		// to string anyway, so it doesn't matter.
+		// Convert all annotation values to strings. Strictly
+		// speaking this means that the bundles are
+		// non-reversible, but juju converts annotations to
+		// string anyway, so it doesn't matter.
 		for _, svc := range ymap(b["services"]) {
 			svc := ymap(svc)
 			annot := ymap(svc["annotations"])
@@ -746,9 +776,6 @@ func (*migrateSuite) testReversible(c *gc.C, id string, data []byte) {
 				if _, ok := val.(string); !ok {
 					annot[key] = fmt.Sprint(val)
 				}
-			}
-			if to, ok := svc["to"]; ok {
-				svc["to"] = fmt.Sprint(to)
 			}
 		}
 
