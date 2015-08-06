@@ -1,6 +1,9 @@
 package migratebundle
 
 import (
+	"fmt"
+	"strings"
+
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/yaml.v1"
@@ -26,7 +29,7 @@ type legacyService struct {
 	Constraints string                 `yaml:",omitempty"`
 	Expose      bool                   `yaml:",omitempty"`
 	Annotations map[string]string      `yaml:",omitempty"`
-	To          string                 `yaml:",omitempty"`
+	To          interface{}            `yaml:",omitempty"`
 	Options     map[string]interface{} `yaml:",omitempty"`
 
 	// Spurious fields, used by existing bundles but not
@@ -57,7 +60,7 @@ type legacyService struct {
 // - A relation clause with multiple targets is expanded
 // into multiple relation clauses.
 //
-// The isSubord argument is used to find out whether a charm is a subordinate.
+// The isSubordinate argument is used to find out whether a charm is a subordinate.
 func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.Reference) (bool, error)) (map[string]*charm.BundleData, error) {
 	var bundles map[string]*legacyBundle
 	if err := yaml.Unmarshal(bundlesYAML, &bundles); err != nil {
@@ -117,15 +120,24 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, err
 			Annotations: svc.Annotations,
 			Constraints: svc.Constraints,
 		}
-		if svc.To != "" {
-			newSvc.To = []string{svc.To}
-			place, err := charm.ParsePlacement(svc.To)
+		if svc.To != nil {
+			to, err := stringList(svc.To)
 			if err != nil {
-				return nil, errgo.Notef(err, "cannot parse 'to' placment clause %q", svc.To)
+				return nil, errgo.Notef(err, "bad 'to' placement clause")
 			}
-			if place.Machine != "" {
-				data.Machines[place.Machine] = new(charm.MachineSpec)
+			// The old syntax differs from the new one only in that
+			// the lxc:foo=0 becomes lxc:foo/0 in the new syntax.
+			for i, p := range to {
+				to[i] = strings.Replace(p, "=", "/", 1)
+				place, err := charm.ParsePlacement(to[i])
+				if err != nil {
+					return nil, errgo.Notef(err, "cannot parse 'to' placment clause %q", p)
+				}
+				if place.Machine != "" {
+					data.Machines[place.Machine] = new(charm.MachineSpec)
+				}
 			}
+			newSvc.To = to
 		}
 		data.Services[name] = newSvc
 	}
@@ -181,21 +193,17 @@ func inherit(b *legacyBundle, bundles map[string]*legacyBundle) (*legacyBundle, 
 	if b.Inherits == nil {
 		return b, nil
 	}
-	// The Inherits clause can be specified as a string or a list.
-	// There are no known bundles which have more than one element in
-	// the list, so fail if there are, as we don't want to implement
-	// multiple inheritance when we don't have to.
-	inherits, ok := b.Inherits.(string)
-	if !ok {
-		list, ok := b.Inherits.([]interface{})
-		if !ok || len(list) != 1 {
-			return nil, errgo.Newf("bad inherits clause %#v", b.Inherits)
-		}
-		inherits, ok = list[0].(string)
-		if !ok {
-			return nil, errgo.Newf("bad inherits clause %#v", b.Inherits)
-		}
+	inheritsList, err := stringList(b.Inherits)
+	if err != nil {
+		return nil, errgo.Notef(err, "bad inherits clause")
 	}
+	if len(inheritsList) == 0 {
+		return b, nil
+	}
+	if len(inheritsList) > 1 {
+		return nil, errgo.Newf("multiple inheritance not supported")
+	}
+	inherits := inheritsList[0]
 	from := bundles[inherits]
 	if from == nil {
 		return nil, errgo.Newf("inherited-from bundle %q not found", inherits)
@@ -206,7 +214,7 @@ func inherit(b *legacyBundle, bundles map[string]*legacyBundle) (*legacyBundle, 
 	// Make a generic copy of both the base and target bundles,
 	// so we can apply inheritance regardless of Go types.
 	var target map[interface{}]interface{}
-	err := yamlCopy(&target, from)
+	err = yamlCopy(&target, from)
 	if err != nil {
 		return nil, errgo.Notef(err, "copy target")
 	}
@@ -225,6 +233,31 @@ func inherit(b *legacyBundle, bundles map[string]*legacyBundle) (*legacyBundle, 
 		return nil, errgo.Notef(err, "copy result")
 	}
 	return &newb, nil
+}
+
+func stringList(v interface{}) ([]string, error) {
+	switch v := v.(type) {
+	case string:
+		return []string{v}, nil
+	case int, float64:
+		// Numbers are casually used as strings; allow that.
+		return []string{fmt.Sprint(v)}, nil
+	case []interface{}:
+		r := make([]string, len(v))
+		for i, elem := range v {
+			switch elem := elem.(type) {
+			case string:
+				r[i] = elem
+			case float64, int:
+				// Numbers are casually used as strings; allow that.
+				r[i] = fmt.Sprint(elem)
+			default:
+				return nil, errgo.Newf("got %#v, expected string", elem)
+			}
+		}
+		return r, nil
+	}
+	return nil, errgo.Newf("got %#v, expected string", v)
 }
 
 // yamlCopy copies the source value into the value
