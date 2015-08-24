@@ -346,6 +346,11 @@ func (s *LegacyCharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 	return charm.ReadCharmArchive(path)
 }
 
+// GetBundle is only defined for implementing Interface.
+func (s *LegacyCharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
+	return nil, errors.New("not implemented: legacy API does not support bundles")
+}
+
 // LegacyInferRepository returns a charm repository inferred from the provided
 // charm or bundle reference. Local references will use the provided path.
 func LegacyInferRepository(ref *charm.Reference, localRepoPath string) (repo Interface, err error) {

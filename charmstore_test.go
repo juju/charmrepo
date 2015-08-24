@@ -20,6 +20,7 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmstore.v5-unstable"
 
@@ -319,7 +320,8 @@ func (s *charmStoreRepoSuite) TestGetErrorCacheDir(c *gc.C) {
 
 func (s *charmStoreRepoSuite) TestGetErrorCharmNotFound(c *gc.C) {
 	ch, err := s.repo.Get(charm.MustParseURL("cs:trusty/no-such"))
-	c.Assert(err, gc.ErrorMatches, `cannot retrieve charm "cs:trusty/no-such": charm not found`)
+	c.Assert(err, gc.ErrorMatches, `cannot retrieve "cs:trusty/no-such": charm not found`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(ch, gc.IsNil)
 }
 

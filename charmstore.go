@@ -76,50 +76,77 @@ func (s *CharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 	if curl.Series == "bundle" {
 		return nil, errgo.Newf("expected a charm URL, got bundle URL %q", curl)
 	}
+	path, err := s.archivePath(curl)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return charm.ReadCharmArchive(path)
+}
 
-	// Prepare the cache directory and retrieve the charm.
+// GetBundle implements Interface.GetBundle.
+func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
+	// The cache location must have been previously set.
+	if CacheDir == "" {
+		panic("charm cache directory path is empty")
+	}
+	if curl.Series != "bundle" {
+		return nil, errgo.Newf("expected a bundle URL, got charm URL %q", curl)
+	}
+	path, err := s.archivePath(curl)
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+	}
+	return charm.ReadBundleArchive(path)
+}
+
+func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
+	// Prepare the cache directory and retrieve the entity archive.
 	if err := os.MkdirAll(CacheDir, 0755); err != nil {
-		return nil, errgo.Notef(err, "cannot create the cache directory")
+		return "", errgo.Notef(err, "cannot create the cache directory")
+	}
+	etype := "charm"
+	if curl.Series == "bundle" {
+		etype = "bundle"
 	}
 	r, id, expectHash, expectSize, err := s.client.GetArchive(curl.Reference())
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot retrieve charm %q: charm not found", curl)
+			return "", errgo.WithCausef(nil, params.ErrNotFound, "cannot retrieve %q: %s not found", curl, etype)
 		}
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot retrieve charm %q", curl), errgo.Any)
+		return "", errgo.NoteMask(err, fmt.Sprintf("cannot retrieve %s %q", etype, curl), errgo.Any)
 	}
 	defer r.Close()
 
 	// Check if the archive already exists in the cache.
-	path := filepath.Join(CacheDir, charm.Quote(id.String())+".charm")
+	path := filepath.Join(CacheDir, charm.Quote(id.String())+"."+etype)
 	if verifyHash384AndSize(path, expectHash, expectSize) == nil {
-		return charm.ReadCharmArchive(path)
+		return path, nil
 	}
 
 	// Verify and save the new archive.
 	f, err := ioutil.TempFile(CacheDir, "charm-download")
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot make temporary file")
+		return "", errgo.Notef(err, "cannot make temporary file")
 	}
 	defer f.Close()
 	hash := sha512.New384()
 	size, err := io.Copy(io.MultiWriter(hash, f), r)
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot read charm archive")
+		return "", errgo.Notef(err, "cannot read entity archive")
 	}
 	if size != expectSize {
-		return nil, errgo.Newf("size mismatch; network corruption?")
+		return "", errgo.Newf("size mismatch; network corruption?")
 	}
 	if fmt.Sprintf("%x", hash.Sum(nil)) != expectHash {
-		return nil, errgo.Newf("hash mismatch; network corruption?")
+		return "", errgo.Newf("hash mismatch; network corruption?")
 	}
 
-	// Move the archive to the expected place, and return the charm.
+	// Move the archive to the expected place, and return its path.
 	if err := utils.ReplaceFile(f.Name(), path); err != nil {
-		return nil, errgo.Notef(err, "cannot move the charm archive")
+		return "", errgo.Notef(err, "cannot move the entity archive")
 	}
-	return charm.ReadCharmArchive(path)
+	return path, nil
 }
 
 func verifyHash384AndSize(path, expectHash string, expectSize int64) error {
