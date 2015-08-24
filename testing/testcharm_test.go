@@ -6,7 +6,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v0/testing"
+	"gopkg.in/juju/charmrepo.v1/testing"
 )
 
 var _ = gc.Suite(&testCharmSuite{})

@@ -13,7 +13,7 @@ import (
 	"github.com/juju/utils/fs"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v0"
+	"gopkg.in/juju/charmrepo.v1"
 )
 
 func check(err error) {

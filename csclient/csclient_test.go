@@ -30,9 +30,9 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v0/csclient"
-	"gopkg.in/juju/charmrepo.v0/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v0/testing"
+	"gopkg.in/juju/charmrepo.v1/csclient"
+	"gopkg.in/juju/charmrepo.v1/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v1/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
@@ -1305,7 +1305,7 @@ func (s *suite) TestWhoAmI(c *gc.C) {
 		HTTPClient: httpClient,
 	})
 	response, err := client.WhoAmI()
-	c.Assert(err, gc.ErrorMatches, `cannot retrieve whoami response: cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
+	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
 	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
 		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
 	}

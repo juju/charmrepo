@@ -11,7 +11,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v0/csclient/params"
+	"gopkg.in/juju/charmrepo.v1/csclient/params"
 )
 
 type suite struct{}
