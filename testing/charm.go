@@ -162,3 +162,12 @@ func (r *Repo) CharmArchive(dst, name string) *charm.CharmArchive {
 	check(err)
 	return ch
 }
+
+// BundleArchive returns an actual charm.BundleArchive created from a new
+// bundle archive file created from the bundle directory named name, in
+// the directory dst.
+func (r *Repo) BundleArchive(dst, name string) *charm.BundleArchive {
+	b, err := charm.ReadBundleArchive(r.BundleArchivePath(dst, name))
+	check(err)
+	return b
+}

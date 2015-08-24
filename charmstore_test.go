@@ -116,6 +116,31 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	return ch, url
 }
 
+// addBundle uploads a bundle to the testing charm store, and returns the
+// resulting bundle and bundle URL.
+func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bundle, *charm.URL) {
+	id := charm.MustParseReference(urlStr)
+	promulgatedRevision := -1
+	if id.User == "" {
+		id.User = "who"
+		promulgatedRevision = id.Revision
+	}
+	b := TestCharms.BundleArchive(c.MkDir(), name)
+
+	// Upload the bundle.
+	err := s.client.UploadBundleWithRevision(id, b, promulgatedRevision)
+	c.Assert(err, gc.IsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Return the bundle and its URL.
+	url, err := id.URL("")
+	c.Assert(err, gc.IsNil)
+	return b, url
+}
+
 type charmStoreRepoSuite struct {
 	charmStoreBaseSuite
 }
@@ -360,6 +385,24 @@ func (s *charmStoreRepoSuite) TestGetErrorHashMismatch(c *gc.C) {
 	})
 	ch, err := repo.Get(url)
 	c.Assert(err, gc.ErrorMatches, `hash mismatch; network corruption\?`)
+	c.Assert(ch, gc.IsNil)
+}
+
+func (s *charmStoreRepoSuite) TestGetBundle(c *gc.C) {
+	// Note that getting a bundle shares most of the logic with charm
+	// retrieval. For this reason, only bundle specific code is tested.
+	s.addCharm(c, "cs:trusty/mysql-0", "mysql")
+	s.addCharm(c, "cs:trusty/wordpress-0", "wordpress")
+	expect, url := s.addBundle(c, "cs:~who/bundle/wordpress-simple-42", "wordpress-simple")
+	b, err := s.repo.GetBundle(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(b.Data(), jc.DeepEquals, expect.Data())
+	c.Assert(b.ReadMe(), gc.Equals, expect.ReadMe())
+}
+
+func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
+	ch, err := s.repo.GetBundle(charm.MustParseURL("cs:trusty/django"))
+	c.Assert(err, gc.ErrorMatches, `expected a bundle URL, got charm URL "cs:trusty/django"`)
 	c.Assert(ch, gc.IsNil)
 }
 
