@@ -99,6 +99,10 @@ func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 	return charm.ReadBundleArchive(path)
 }
 
+// archivePath returns a local path to the downloaded archive of the given
+// charm or bundle URL, storing it in CacheDir, which it creates if necessary.
+// If an archive with a matching SHA hash already exists locally, it will use
+// the local version.
 func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 	// Prepare the cache directory and retrieve the entity archive.
 	if err := os.MkdirAll(CacheDir, 0755); err != nil {
