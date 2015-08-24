@@ -44,6 +44,21 @@ type ArchiveUploadResponse struct {
 	PromulgatedId *charm.Reference `json:",omitempty"`
 }
 
+const (
+	Download = "download"
+	Traffic  = "traffic"
+	Deploy   = "deploy"
+)
+
+// StatsUpdateRequest holds the paramaeters for a put to /stats/update.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
+type StatsUpdateRequest struct {
+	Timestamp      time.Time
+	Type           string
+	CharmReference *charm.Reference
+}
+
+
 // ExpandedId holds a charm or bundle fully qualified id.
 // A slice of ExpandedId is used as response for
 // id/expand-id GET requests.
