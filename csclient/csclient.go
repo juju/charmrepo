@@ -156,6 +156,11 @@ func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Re
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
+// StatsUpdate updates the download stats for the given id and specific time.
+func (c *Client) StatsUpdate(req params.StatsUpdateRequest) error {
+	return c.Put("/stats/update/", req)
+}
+
 // UploadCharm uploads the given charm to the charm store with the given id,
 // which must not specify a revision.
 // The accepted charm implementations are charm.CharmDir and
@@ -519,6 +524,7 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	if err != nil {
 		return nil, errgo.Mask(err, errgo.Any)
 	}
+
 	if resp.StatusCode == http.StatusOK {
 		return resp, nil
 	}
