@@ -130,3 +130,9 @@ func (r *LocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
 	}
 	return nil, charmNotFound(curl, r.Path)
 }
+
+// GetBundle implements Interface.GetBundle.
+func (r *LocalRepository) GetBundle(curl *charm.URL) (charm.Bundle, error) {
+	// TODO frankban: implement this.
+	return nil, errgo.New("not implemented yet")
+}

@@ -19,6 +19,9 @@ type Interface interface {
 	// Get returns the charm referenced by curl.
 	Get(curl *charm.URL) (charm.Charm, error)
 
+	// GetBundle returns the bundle referenced by curl.
+	GetBundle(curl *charm.URL) (charm.Bundle, error)
+
 	// Latest returns the latest revision of the charms referenced by curls,
 	// regardless of the revision set on each curl.
 	Latest(curls ...*charm.URL) ([]CharmRevision, error)

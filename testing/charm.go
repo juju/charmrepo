@@ -8,12 +8,9 @@ import (
 	"os"
 	"path/filepath"
 	"runtime"
-	"sync"
 
 	"github.com/juju/utils/fs"
 	"gopkg.in/juju/charm.v6-unstable"
-
-	"gopkg.in/juju/charmrepo.v0"
 )
 
 func check(err error) {
@@ -166,133 +163,11 @@ func (r *Repo) CharmArchive(dst, name string) *charm.CharmArchive {
 	return ch
 }
 
-// MockCharmStore implements charm/charmrepo.Interface and is used to isolate
-// tests that would otherwise need to hit the real charm store.
-type MockCharmStore struct {
-	charms map[string]map[int]*charm.CharmArchive
-
-	mu            sync.Mutex // protects the following fields
-	authAttrs     string
-	testMode      bool
-	defaultSeries string
-}
-
-func NewMockCharmStore() *MockCharmStore {
-	return &MockCharmStore{charms: map[string]map[int]*charm.CharmArchive{}}
-}
-
-// SetAuthAttrs overwrites the value returned by AuthAttrs
-func (s *MockCharmStore) SetAuthAttrs(auth string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.authAttrs = auth
-}
-
-// AuthAttrs returns the AuthAttrs for this charm store.
-func (s *MockCharmStore) AuthAttrs() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.authAttrs
-}
-
-// WithTestMode returns a repository Interface where testMode is set to value
-// passed to this method.
-func (s *MockCharmStore) WithTestMode(testMode bool) charmrepo.Interface {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.testMode = testMode
-	return s
-}
-
-// TestMode returns the test mode setting of this charm store.
-func (s *MockCharmStore) TestMode() bool {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.testMode
-}
-
-// SetDefaultSeries overwrites the default series for this charm store.
-func (s *MockCharmStore) SetDefaultSeries(series string) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	s.defaultSeries = series
-}
-
-// DefaultSeries returns the default series for this charm store.
-func (s *MockCharmStore) DefaultSeries() string {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	return s.defaultSeries
-}
-
-// Resolve implements charm/charmrepo.Interface.Resolve.
-func (s *MockCharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
-	return ref.URL(s.DefaultSeries())
-}
-
-// SetCharm adds and removes charms in s. The affected charm is identified by
-// charmURL, which must be revisioned. If archive is nil, the charm will be
-// removed; otherwise, it will be stored. It is an error to store a archive
-// under a charmURL that does not share its name and revision.
-func (s *MockCharmStore) SetCharm(charmURL *charm.URL, archive *charm.CharmArchive) error {
-	base := charmURL.WithRevision(-1).String()
-	if charmURL.Revision < 0 {
-		return fmt.Errorf("bad charm url revision")
-	}
-	if archive == nil {
-		delete(s.charms[base], charmURL.Revision)
-		return nil
-	}
-	archiveRev := archive.Revision()
-	archiveName := archive.Meta().Name
-	if archiveName != charmURL.Name || archiveRev != charmURL.Revision {
-		return fmt.Errorf("charm url %s mismatch with archive %s-%d", charmURL, archiveName, archiveRev)
-	}
-	if _, found := s.charms[base]; !found {
-		s.charms[base] = map[int]*charm.CharmArchive{}
-	}
-	s.charms[base][charmURL.Revision] = archive
-	return nil
-}
-
-// interpret extracts from charmURL information relevant to both Latest and
-// Get. The returned "base" is always the string representation of the
-// unrevisioned part of charmURL; the "rev" wil be taken from the charmURL if
-// available, and will otherwise be the revision of the latest charm in the
-// store with the same "base".
-func (s *MockCharmStore) interpret(charmURL *charm.URL) (base string, rev int) {
-	base, rev = charmURL.WithRevision(-1).String(), charmURL.Revision
-	if rev == -1 {
-		for candidate := range s.charms[base] {
-			if candidate > rev {
-				rev = candidate
-			}
-		}
-	}
-	return
-}
-
-// Get implements charm/charmrepo.Interface.Get.
-func (s *MockCharmStore) Get(charmURL *charm.URL) (charm.Charm, error) {
-	base, rev := s.interpret(charmURL)
-	charm, found := s.charms[base][rev]
-	if !found {
-		return nil, fmt.Errorf("charm not found in mock store: %s", charmURL)
-	}
-	return charm, nil
-}
-
-// Latest implements charm/charmrepo.Interface.Latest.
-func (s *MockCharmStore) Latest(charmURLs ...*charm.URL) ([]charmrepo.CharmRevision, error) {
-	result := make([]charmrepo.CharmRevision, len(charmURLs))
-	for i, curl := range charmURLs {
-		charmURL := curl.WithRevision(-1)
-		base, rev := s.interpret(charmURL)
-		if _, found := s.charms[base][rev]; !found {
-			result[i].Err = fmt.Errorf("charm not found in mock store: %s", charmURL)
-		} else {
-			result[i].Revision = rev
-		}
-	}
-	return result, nil
+// BundleArchive returns an actual charm.BundleArchive created from a new
+// bundle archive file created from the bundle directory named name, in
+// the directory dst.
+func (r *Repo) BundleArchive(dst, name string) *charm.BundleArchive {
+	b, err := charm.ReadBundleArchive(r.BundleArchivePath(dst, name))
+	check(err)
+	return b
 }
