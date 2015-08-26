@@ -158,7 +158,7 @@ func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Re
 
 // StatsUpdate updates the download stats for the given id and specific time.
 func (c *Client) StatsUpdate(req params.StatsUpdateRequest) error {
-	return c.Put("/stats/update/", req)
+	return c.Put("/stats/update", req)
 }
 
 // UploadCharm uploads the given charm to the charm store with the given id,
