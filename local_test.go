@@ -18,8 +18,9 @@ import (
 
 type LocalRepoSuite struct {
 	gitjujutesting.FakeHomeSuite
-	repo       *charmrepo.LocalRepository
-	seriesPath string
+	repo        *charmrepo.LocalRepository
+	charmsPath  string
+	bundlesPath string
 }
 
 var _ = gc.Suite(&LocalRepoSuite{})
@@ -28,20 +29,26 @@ func (s *LocalRepoSuite) SetUpTest(c *gc.C) {
 	s.FakeHomeSuite.SetUpTest(c)
 	root := c.MkDir()
 	s.repo = &charmrepo.LocalRepository{Path: root}
-	s.seriesPath = filepath.Join(root, "quantal")
-	c.Assert(os.Mkdir(s.seriesPath, 0777), gc.IsNil)
+	s.bundlesPath = filepath.Join(root, "bundle")
+	s.charmsPath = filepath.Join(root, "quantal")
+	c.Assert(os.Mkdir(s.bundlesPath, 0777), jc.ErrorIsNil)
+	c.Assert(os.Mkdir(s.charmsPath, 0777), jc.ErrorIsNil)
 }
 
 func (s *LocalRepoSuite) addCharmArchive(name string) string {
-	return TestCharms.CharmArchivePath(s.seriesPath, name)
+	return TestCharms.CharmArchivePath(s.charmsPath, name)
 }
 
-func (s *LocalRepoSuite) addDir(name string) string {
-	return TestCharms.ClonedDirPath(s.seriesPath, name)
+func (s *LocalRepoSuite) addCharmDir(name string) string {
+	return TestCharms.ClonedDirPath(s.charmsPath, name)
+}
+
+func (s *LocalRepoSuite) addBundleDir(name string) string {
+	return TestCharms.ClonedBundleDirPath(s.bundlesPath, name)
 }
 
 func (s *LocalRepoSuite) checkNotFoundErr(c *gc.C, err error, charmURL *charm.URL) {
-	expect := `charm not found in "` + s.repo.Path + `": ` + charmURL.String()
+	expect := `entity not found in "` + s.repo.Path + `": ` + charmURL.String()
 	c.Check(err, gc.ErrorMatches, expect)
 }
 
@@ -64,16 +71,20 @@ func (s *LocalRepoSuite) TestMissingRepo(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	_, err = s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
+	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
+	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	c.Assert(ioutil.WriteFile(s.repo.Path, nil, 0666), gc.IsNil)
 	_, err = charmrepo.Latest(s.repo, charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	_, err = s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
+	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
+	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 }
 
 func (s *LocalRepoSuite) TestMultipleVersions(c *gc.C) {
 	charmURL := charm.MustParseURL("local:quantal/upgrade")
-	s.addDir("upgrade1")
+	s.addCharmDir("upgrade1")
 	rev, err := charmrepo.Latest(s.repo, charmURL)
 	c.Assert(err, gc.IsNil)
 	c.Assert(rev, gc.Equals, 1)
@@ -81,7 +92,7 @@ func (s *LocalRepoSuite) TestMultipleVersions(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Revision(), gc.Equals, 1)
 
-	s.addDir("upgrade2")
+	s.addCharmDir("upgrade2")
 	rev, err = charmrepo.Latest(s.repo, charmURL)
 	c.Assert(err, gc.IsNil)
 	c.Assert(rev, gc.Equals, 2)
@@ -118,17 +129,17 @@ func (s *LocalRepoSuite) TestCharmArchive(c *gc.C) {
 }
 
 func (s *LocalRepoSuite) TestLogsErrors(c *gc.C) {
-	err := ioutil.WriteFile(filepath.Join(s.seriesPath, "blah.charm"), nil, 0666)
+	err := ioutil.WriteFile(filepath.Join(s.charmsPath, "blah.charm"), nil, 0666)
 	c.Assert(err, gc.IsNil)
-	err = os.Mkdir(filepath.Join(s.seriesPath, "blah"), 0666)
+	err = os.Mkdir(filepath.Join(s.charmsPath, "blah"), 0666)
 	c.Assert(err, gc.IsNil)
-	samplePath := s.addDir("upgrade2")
+	samplePath := s.addCharmDir("upgrade2")
 	gibberish := []byte("don't parse me by")
 	err = ioutil.WriteFile(filepath.Join(samplePath, "metadata.yaml"), gibberish, 0666)
 	c.Assert(err, gc.IsNil)
 
 	charmURL := charm.MustParseURL("local:quantal/dummy")
-	s.addDir("dummy")
+	s.addCharmDir("dummy")
 	ch, err := s.repo.Get(charmURL)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Revision(), gc.Equals, 1)
@@ -144,11 +155,11 @@ func renameSibling(c *gc.C, path, name string) {
 }
 
 func (s *LocalRepoSuite) TestIgnoresUnpromisingNames(c *gc.C) {
-	err := ioutil.WriteFile(filepath.Join(s.seriesPath, "blah.notacharm"), nil, 0666)
+	err := ioutil.WriteFile(filepath.Join(s.charmsPath, "blah.notacharm"), nil, 0666)
 	c.Assert(err, gc.IsNil)
-	err = os.Mkdir(filepath.Join(s.seriesPath, ".blah"), 0666)
+	err = os.Mkdir(filepath.Join(s.charmsPath, ".blah"), 0666)
 	c.Assert(err, gc.IsNil)
-	renameSibling(c, s.addDir("dummy"), ".dummy")
+	renameSibling(c, s.addCharmDir("dummy"), ".dummy")
 	renameSibling(c, s.addCharmArchive("dummy"), "dummy.notacharm")
 	charmURL := charm.MustParseURL("local:quantal/dummy")
 
@@ -161,7 +172,7 @@ func (s *LocalRepoSuite) TestIgnoresUnpromisingNames(c *gc.C) {
 
 func (s *LocalRepoSuite) TestFindsSymlinks(c *gc.C) {
 	realPath := TestCharms.ClonedDirPath(c.MkDir(), "dummy")
-	linkPath := filepath.Join(s.seriesPath, "dummy")
+	linkPath := filepath.Join(s.charmsPath, "dummy")
 	err := os.Symlink(realPath, linkPath)
 	c.Assert(err, gc.IsNil)
 	ch, err := s.repo.Get(charm.MustParseURL("local:quantal/dummy"))
@@ -174,10 +185,10 @@ func (s *LocalRepoSuite) TestFindsSymlinks(c *gc.C) {
 
 func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Add some charms to the local repo.
-	s.addDir("upgrade1")
-	s.addDir("upgrade2")
-	s.addDir("wordpress")
-	s.addDir("riak")
+	s.addCharmDir("upgrade1")
+	s.addCharmDir("upgrade2")
+	s.addCharmDir("wordpress")
+	s.addCharmDir("riak")
 
 	// Define the tests to be run.
 	tests := []struct {
@@ -204,10 +215,10 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		url: "local:quantal/wordpress-2",
 	}, {
 		id:  "local:trusty/riak",
-		err: "charm not found .*: local:trusty/riak",
+		err: "entity not found .*: local:trusty/riak",
 	}, {
 		id:  "local:quantal/no-such",
-		err: "charm not found .*: local:quantal/no-such",
+		err: "entity not found .*: local:quantal/no-such",
 	}, {
 		id:  "local:upgrade",
 		err: "no series specified for local:upgrade",
@@ -224,5 +235,72 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		}
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
+	}
+}
+
+func (s *LocalRepoSuite) TestGetBundle(c *gc.C) {
+	url := charm.MustParseURL("local:bundle/openstack")
+	s.addBundleDir("openstack")
+	b, err := s.repo.GetBundle(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(b.Data(), jc.DeepEquals, TestCharms.BundleDir("openstack").Data())
+}
+
+func (s *LocalRepoSuite) TestGetBundleSymlink(c *gc.C) {
+	realPath := TestCharms.ClonedBundleDirPath(c.MkDir(), "wordpress-simple")
+	linkPath := filepath.Join(s.bundlesPath, "wordpress-simple")
+	err := os.Symlink(realPath, linkPath)
+	c.Assert(err, jc.ErrorIsNil)
+	url := charm.MustParseURL("local:bundle/wordpress-simple")
+	b, err := s.repo.GetBundle(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(b.Data(), jc.DeepEquals, TestCharms.BundleDir("wordpress-simple").Data())
+}
+
+func (s *LocalRepoSuite) TestGetBundleErrorNotFound(c *gc.C) {
+	url := charm.MustParseURL("local:bundle/no-such")
+	b, err := s.repo.GetBundle(url)
+	s.checkNotFoundErr(c, err, url)
+	c.Assert(b, gc.IsNil)
+}
+
+var invalidURLTests = []struct {
+	about  string
+	bundle bool
+	url    string
+	err    string
+}{{
+	about: "get charm: non-local schema",
+	url:   "cs:trusty/django-42",
+	err:   `local repository got URL with non-local schema: "cs:trusty/django-42"`,
+}, {
+	about:  "get bundle: non-local schema",
+	bundle: true,
+	url:    "cs:bundle/django-scalable",
+	err:    `local repository got URL with non-local schema: "cs:bundle/django-scalable"`,
+}, {
+	about: "get charm: bundle provided",
+	url:   "local:bundle/rails",
+	err:   `expected a charm URL, got bundle URL "local:bundle/rails"`,
+}, {
+	about:  "get bundle: charm provided",
+	bundle: true,
+	url:    "local:trusty/rails",
+	err:    `expected a bundle URL, got charm URL "local:trusty/rails"`,
+}}
+
+func (s *LocalRepoSuite) TestInvalidURLTest(c *gc.C) {
+	var err error
+	var e interface{}
+	for i, test := range invalidURLTests {
+		c.Logf("test %d: %s", i, test.about)
+		curl := charm.MustParseURL(test.url)
+		if test.bundle {
+			e, err = s.repo.GetBundle(curl)
+		} else {
+			e, err = s.repo.Get(curl)
+		}
+		c.Assert(e, gc.IsNil)
+		c.Assert(err, gc.ErrorMatches, test.err)
 	}
 }
