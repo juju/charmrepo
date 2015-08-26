@@ -84,23 +84,16 @@ func mightBeCharm(info os.FileInfo) bool {
 // -1, it returns the latest charm that matches curl. If multiple candidates
 // satisfy the foregoing, the first one encountered will be returned.
 func (r *LocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
-	if curl.Schema != "local" {
-		return nil, fmt.Errorf("local repository got URL with non-local schema: %q", curl)
-	}
-	info, err := os.Stat(r.Path)
-	if err != nil {
-		if os.IsNotExist(err) {
-			err = repoNotFound(r.Path)
-		}
+	if err := r.checkUrlAndPath(curl); err != nil {
 		return nil, err
 	}
-	if !info.IsDir() {
-		return nil, repoNotFound(r.Path)
+	if curl.Series == "bundle" {
+		return nil, errgo.Newf("expected a charm URL, got bundle URL %q", curl)
 	}
 	path := filepath.Join(r.Path, curl.Series)
 	infos, err := ioutil.ReadDir(path)
 	if err != nil {
-		return nil, charmNotFound(curl, r.Path)
+		return nil, entityNotFound(curl, r.Path)
 	}
 	var latest charm.Charm
 	for _, info := range infos {
@@ -128,11 +121,49 @@ func (r *LocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
 	if curl.Revision == -1 && latest != nil {
 		return latest, nil
 	}
-	return nil, charmNotFound(curl, r.Path)
+	return nil, entityNotFound(curl, r.Path)
 }
 
 // GetBundle implements Interface.GetBundle.
 func (r *LocalRepository) GetBundle(curl *charm.URL) (charm.Bundle, error) {
-	// TODO frankban: implement this.
-	return nil, errgo.New("not implemented yet")
+	if err := r.checkUrlAndPath(curl); err != nil {
+		return nil, err
+	}
+	if curl.Series != "bundle" {
+		return nil, errgo.Newf("expected a bundle URL, got charm URL %q", curl)
+	}
+	// Note that the bundle does not inherently own a name different than the
+	// directory name. Neither the name nor the revision are included in the
+	// bundle metadata.
+	// TODO frankban: handle bundle revisions, totally ignored for now.
+	path := filepath.Join(r.Path, curl.Series, curl.Name)
+	info, err := os.Stat(path)
+	if err != nil {
+		return nil, entityNotFound(curl, r.Path)
+	}
+	// Do not support bundle archives for the time being. What archive name
+	// should we use? What's the use case for compressing bundles anyway?
+	if !info.IsDir() {
+		return nil, entityNotFound(curl, r.Path)
+	}
+	return charm.ReadBundleDir(path)
+}
+
+// checkUrlAndPath checks that the given URL represents a local entity and that
+// the repository path exists.
+func (r *LocalRepository) checkUrlAndPath(curl *charm.URL) error {
+	if curl.Schema != "local" {
+		return fmt.Errorf("local repository got URL with non-local schema: %q", curl)
+	}
+	info, err := os.Stat(r.Path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return repoNotFound(r.Path)
+		}
+		return err
+	}
+	if !info.IsDir() {
+		return repoNotFound(r.Path)
+	}
+	return nil
 }

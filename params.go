@@ -50,8 +50,8 @@ func repoNotFound(path string) error {
 	return &NotFoundError{fmt.Sprintf("no repository found at %q", path)}
 }
 
-func charmNotFound(curl *charm.URL, repoPath string) error {
-	return &NotFoundError{fmt.Sprintf("charm not found in %q: %s", repoPath, curl)}
+func entityNotFound(curl *charm.URL, repoPath string) error {
+	return &NotFoundError{fmt.Sprintf("entity not found in %q: %s", repoPath, curl)}
 }
 
 func CharmNotFound(url string) error {
