@@ -363,6 +363,7 @@ func (s *charmStoreRepoSuite) TestGetErrorServer(c *gc.C) {
 	})
 	ch, err := repo.Get(charm.MustParseURL("cs:trusty/django"))
 	c.Assert(err, gc.ErrorMatches, `cannot retrieve charm "cs:trusty/django": cannot get archive: bad wolf`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 	c.Assert(ch, gc.IsNil)
 }
 

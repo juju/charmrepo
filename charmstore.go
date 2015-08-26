@@ -78,7 +78,7 @@ func (s *CharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 	}
 	path, err := s.archivePath(curl)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return charm.ReadCharmArchive(path)
 }
@@ -94,7 +94,7 @@ func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 	}
 	path, err := s.archivePath(curl)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		return nil, errgo.Mask(err, errgo.Any)
 	}
 	return charm.ReadBundleArchive(path)
 }
