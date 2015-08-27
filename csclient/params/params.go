@@ -45,10 +45,11 @@ type ArchiveUploadResponse struct {
 }
 
 // Constants for the StatsUpdateRequest
+type StatsUpdateType string
 const (
-	Download = "download" // Accesses with non listed clients and web browsers.
-	Traffic  = "traffic"  // Bots and unknown clients.
-	Deploy   = "deploy"   // known clients like juju client.
+	UpdateDownload StatsUpdateType = "download" // Accesses with non listed clients and web browsers.
+	UpdateTraffic StatsUpdateType = "traffic"  // Bots and unknown clients.
+	UpdateDeploy StatsUpdateType = "deploy"   // known clients like juju client.
 )
 
 // StatsUpdateRequest holds the parameters for a put to /stats/update.
@@ -61,7 +62,7 @@ type StatsUpdateRequest struct {
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
 type StatsUpdateEntry struct {
 	Timestamp      time.Time        // Time when the update did happen.
-	Type           string           // One of the constant Download, Traffic or Deploy.
+	Type           StatsUpdateType  // One of the constant Download, Traffic or Deploy.
 	CharmReference *charm.Reference // The charm to be updated.
 }
 
