@@ -60,9 +60,9 @@ type StatsUpdateRequest struct {
 // StatsUpdateEntry holds an entry of the StatsUpdateRequest for a put to /stats/update.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
 type StatsUpdateEntry struct {
-	Timestamp      time.Time
-	Type           string
-	CharmReference *charm.Reference
+	Timestamp      time.Time        // Time when the update did happen.
+	Type           string           // One of the constant Download, Traffic or Deploy.
+	CharmReference *charm.Reference // The charm to be updated.
 }
 
 // ExpandedId holds a charm or bundle fully qualified id.
