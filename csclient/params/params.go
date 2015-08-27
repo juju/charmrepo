@@ -54,6 +54,12 @@ const (
 // StatsUpdateRequest holds the parameters for a put to /stats/update.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
 type StatsUpdateRequest struct {
+	Entries []StatsUpdateEntry
+}
+
+// StatsUpdateEntry holds an entry of the StatsUpdateRequest for a put to /stats/update.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
+type StatsUpdateEntry struct {
 	Timestamp      time.Time
 	Type           string
 	CharmReference *charm.Reference
