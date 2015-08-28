@@ -304,20 +304,20 @@ func (s *suite) TestGetArchiveWithStatsDisabled(c *gc.C) {
 	s.checkCharmDownloads(c, key, 0)
 }
 
-//func (s *suite) TestStatsUpdate(c *gc.C) {
-//	key := s.checkGetArchive(c)
-//	s.checkCharmDownloads(c, key, 1)
-//	err := s.client.StatsUpdate(params.StatsUpdateRequest {
-//		Entries: []params.StatsUpdateEntry{{
-//			CharmReference: charm.MustParseReference("~charmers/utopic/wordpress-42"),
-//			Timestamp: time.Now(),
-//			Type: params.Deploy
-//		}},
-//	})
-//	c.Assert(err, gc.IsNil)
-//	s.checkCharmDownloads(c, key, 2)
-//}
-//
+func (s *suite) TestStatsUpdate(c *gc.C) {
+	key := s.checkGetArchive(c)
+	s.checkCharmDownloads(c, key, 1)
+	err := s.client.StatsUpdate(params.StatsUpdateRequest {
+		Entries: []params.StatsUpdateEntry{{
+			CharmReference: charm.MustParseReference("~charmers/utopic/wordpress-42"),
+			Timestamp: time.Now(),
+			Type: params.UpdateDeploy,
+		}},
+	})
+	c.Assert(err, gc.IsNil)
+	s.checkCharmDownloads(c, key, 2)
+}
+
 var checkDownloadsAttempt = utils.AttemptStrategy{
 	Total: 1 * time.Second,
 	Delay: 100 * time.Millisecond,
