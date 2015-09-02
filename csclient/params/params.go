@@ -12,6 +12,7 @@ import (
 
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/macaroon.v1"
 )
 
 const (
@@ -46,10 +47,11 @@ type ArchiveUploadResponse struct {
 
 // Constants for the StatsUpdateRequest
 type StatsUpdateType string
+
 const (
 	UpdateDownload StatsUpdateType = "download" // Accesses with non listed clients and web browsers.
-	UpdateTraffic StatsUpdateType = "traffic"  // Bots and unknown clients.
-	UpdateDeploy StatsUpdateType = "deploy"   // known clients like juju client.
+	UpdateTraffic  StatsUpdateType = "traffic"  // Bots and unknown clients.
+	UpdateDeploy   StatsUpdateType = "deploy"   // known clients like juju client.
 )
 
 // StatsUpdateRequest holds the parameters for a put to /stats/update.
@@ -304,3 +306,10 @@ const (
 	LegacyStatisticsImportStart    = "legacy statistics import started"
 	LegacyStatisticsImportComplete = "legacy statistics import completed"
 )
+
+// SetAuthCookie holds the parameters used to make a set-auth-cookie request
+// to the charm store.
+type SetAuthCookie struct {
+	// Macaroons holds a slice of macaroons.
+	Macaroons macaroon.Slice
+}
