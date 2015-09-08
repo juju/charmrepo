@@ -189,6 +189,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	s.addCharmDir("upgrade2")
 	s.addCharmDir("wordpress")
 	s.addCharmDir("riak")
+	s.addBundleDir("openstack")
 
 	// Define the tests to be run.
 	tests := []struct {
@@ -214,11 +215,20 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		id:  "local:quantal/wordpress-2",
 		url: "local:quantal/wordpress-2",
 	}, {
+		id:  "local:bundle/openstack",
+		url: "local:bundle/openstack-0",
+	}, {
+		id:  "local:bundle/openstack-42",
+		url: "local:bundle/openstack-42",
+	}, {
 		id:  "local:trusty/riak",
 		err: "entity not found .*: local:trusty/riak",
 	}, {
 		id:  "local:quantal/no-such",
 		err: "entity not found .*: local:quantal/no-such",
+	}, {
+		id:  "local:bundle/no-such",
+		err: "entity not found .*: local:bundle/no-such",
 	}, {
 		id:  "local:upgrade",
 		err: "no series specified for local:upgrade",
