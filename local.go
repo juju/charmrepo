@@ -51,9 +51,6 @@ func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.URL, error) {
 		return u, nil
 	}
 	if ref.Series == "bundle" {
-		if _, err = r.GetBundle(u); err != nil {
-			return nil, err
-		}
 		// Bundles do not have revision files and the revision is not included
 		// in metadata. For this reason, local bundles always have revision 0.
 		return u.WithRevision(0), nil

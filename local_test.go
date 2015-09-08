@@ -189,7 +189,6 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	s.addCharmDir("upgrade2")
 	s.addCharmDir("wordpress")
 	s.addCharmDir("riak")
-	s.addBundleDir("openstack")
 
 	// Define the tests to be run.
 	tests := []struct {
@@ -227,9 +226,6 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		id:  "local:quantal/no-such",
 		err: "entity not found .*: local:quantal/no-such",
 	}, {
-		id:  "local:bundle/no-such",
-		err: "entity not found .*: local:bundle/no-such",
-	}, {
 		id:  "local:upgrade",
 		err: "no series specified for local:upgrade",
 	}}
@@ -239,7 +235,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		c.Logf("test %d: %s", i, test.id)
 		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
-			c.Assert(err.Error(), gc.Matches, test.err)
+			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(url, gc.IsNil)
 			continue
 		}
