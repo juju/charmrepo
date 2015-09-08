@@ -214,6 +214,12 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		id:  "local:quantal/wordpress-2",
 		url: "local:quantal/wordpress-2",
 	}, {
+		id:  "local:bundle/openstack",
+		url: "local:bundle/openstack-0",
+	}, {
+		id:  "local:bundle/openstack-42",
+		url: "local:bundle/openstack-42",
+	}, {
 		id:  "local:trusty/riak",
 		err: "entity not found .*: local:trusty/riak",
 	}, {
@@ -229,7 +235,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		c.Logf("test %d: %s", i, test.id)
 		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
-			c.Assert(err.Error(), gc.Matches, test.err)
+			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(url, gc.IsNil)
 			continue
 		}

@@ -50,6 +50,11 @@ func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.URL, error) {
 	if ref.Revision != -1 {
 		return u, nil
 	}
+	if ref.Series == "bundle" {
+		// Bundles do not have revision files and the revision is not included
+		// in metadata. For this reason, local bundles always have revision 0.
+		return u.WithRevision(0), nil
+	}
 	ch, err := r.Get(u)
 	if err != nil {
 		return nil, err
