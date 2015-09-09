@@ -236,7 +236,14 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 	if _, err := s.client.Meta(ref, &result); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve charm URL %q: charm not found", ref)
+			etype := "charm"
+			switch ref.Series {
+			case "bundle":
+				etype = "bundle"
+			case "":
+				etype = "entity"
+			}
+			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
 		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
