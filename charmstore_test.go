@@ -537,10 +537,13 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		url: "cs:utopic/mysql-47",
 	}, {
 		id:  "~dalek/utopic/riak-100",
-		err: `cannot resolve charm URL "cs:~dalek/utopic/riak-100": charm not found`,
+		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
+	}, {
+		id:  "bundle/no-such",
+		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
 	}, {
 		id:  "no-such",
-		err: `cannot resolve charm URL "cs:no-such": charm not found`,
+		err: `cannot resolve URL "cs:no-such": entity not found`,
 	}}
 
 	// Run the tests.
