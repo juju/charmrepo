@@ -146,7 +146,11 @@ func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 		return "", errgo.Newf("hash mismatch; network corruption?")
 	}
 
-	// Move the archive to the expected place, and return its path.
+	// Move the archive to the expected place, and return the charm.
+
+	// Note that we need to close the temporary file before moving
+	// it because otherwise Windows prohibits the rename.
+	f.Close()
 	if err := utils.ReplaceFile(f.Name(), path); err != nil {
 		return "", errgo.Notef(err, "cannot move the entity archive")
 	}
