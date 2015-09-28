@@ -18,7 +18,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
+	"gopkg.in/juju/charmrepo.v2"
 )
 
 var logger = loggo.GetLogger("juju.charm.testing.mockstore")
