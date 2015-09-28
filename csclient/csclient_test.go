@@ -30,7 +30,6 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v2"
 	"gopkg.in/juju/charmrepo.v2/csclient"
 	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
@@ -291,7 +290,7 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 }
 
 func (s *suite) TestGetArchive(c *gc.C) {
-	if !charmrepo.MongoJSEnabled() {
+	if jujutesting.MgoServer.WithoutV8 {
 		c.Skip("mongo javascript not enabled")
 	}
 	key := s.checkGetArchive(c)
@@ -309,7 +308,7 @@ func (s *suite) TestGetArchiveWithStatsDisabled(c *gc.C) {
 }
 
 func (s *suite) TestStatsUpdate(c *gc.C) {
-	if !charmrepo.MongoJSEnabled() {
+	if jujutesting.MgoServer.WithoutV8 {
 		c.Skip("mongo javascript not enabled")
 	}
 	key := s.checkGetArchive(c)
