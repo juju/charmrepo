@@ -261,6 +261,9 @@ func (s *charmStoreRepoSuite) TestGetInvalidCache(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
+	if !charmrepo.MongoJSEnabled() {
+		c.Skip("mongo javascript not enabled")
+	}
 	_, url := s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 
 	// Retrieve the charm.

@@ -30,6 +30,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/mgo.v2"
 
+	"gopkg.in/juju/charmrepo.v2"
 	"gopkg.in/juju/charmrepo.v2/csclient"
 	"gopkg.in/juju/charmrepo.v2/csclient/params"
 	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
@@ -290,6 +291,9 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 }
 
 func (s *suite) TestGetArchive(c *gc.C) {
+	if !charmrepo.MongoJSEnabled() {
+		c.Skip("mongo javascript not enabled")
+	}
 	key := s.checkGetArchive(c)
 
 	// Check that the downloads count for the entity has been updated.
@@ -305,13 +309,16 @@ func (s *suite) TestGetArchiveWithStatsDisabled(c *gc.C) {
 }
 
 func (s *suite) TestStatsUpdate(c *gc.C) {
+	if !charmrepo.MongoJSEnabled() {
+		c.Skip("mongo javascript not enabled")
+	}
 	key := s.checkGetArchive(c)
 	s.checkCharmDownloads(c, key, 1)
-	err := s.client.StatsUpdate(params.StatsUpdateRequest {
+	err := s.client.StatsUpdate(params.StatsUpdateRequest{
 		Entries: []params.StatsUpdateEntry{{
 			CharmReference: charm.MustParseReference("~charmers/utopic/wordpress-42"),
-			Timestamp: time.Now(),
-			Type: params.UpdateDeploy,
+			Timestamp:      time.Now(),
+			Type:           params.UpdateDeploy,
 		}},
 	})
 	c.Assert(err, gc.IsNil)
@@ -428,7 +435,7 @@ var getArchiveWithBadResponseTests = []struct {
 		Body:          ioutil.NopCloser(strings.NewReader("")),
 		ContentLength: fakeSize,
 	},
-	expectError: `invalid entity id found in response: charm URL has invalid schema: "no:such"`,
+	expectError: `invalid entity id found in response: charm or bundle URL has invalid schema: "no:such"`,
 }, {
 	about: "partial entity id header",
 	response: &http.Response{
