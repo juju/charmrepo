@@ -496,7 +496,7 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		revs, err := s.repo.Latest(test.urls...)
+		revs, err := s.repo.(*charmrepo.CharmStore).Latest(test.urls...)
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(revs, jc.DeepEquals, test.revs)
 	}
@@ -552,7 +552,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		url, err := s.repo.Resolve(test.id)
 		if test.err != "" {
 			c.Assert(err.Error(), gc.Equals, test.err)
 			c.Assert(url, gc.IsNil)

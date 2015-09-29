@@ -77,7 +77,11 @@ func (s *LegacyCharmStore) get(url string) (resp *http.Response, err error) {
 }
 
 // Resolve canonicalizes charm URLs any implied series in the reference.
-func (s *LegacyCharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *LegacyCharmStore) Resolve(curlStr string) (*charm.URL, error) {
+	ref, err := charm.ParseReference(curlStr)
+	if err != nil {
+		return nil, err
+	}
 	infos, err := s.Info(ref)
 	if err != nil {
 		return nil, err
@@ -361,7 +365,7 @@ func LegacyInferRepository(ref *charm.Reference, localRepoPath string) (repo Int
 		if localRepoPath == "" {
 			return nil, errors.New("path to local repository not specified")
 		}
-		repo = &LocalRepository{Path: localRepoPath}
+		repo = &legacyLocalRepository{Path: localRepoPath}
 	default:
 		return nil, fmt.Errorf("unknown schema for charm reference %q", ref)
 	}

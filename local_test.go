@@ -18,7 +18,8 @@ import (
 
 type LocalRepoSuite struct {
 	gitjujutesting.FakeHomeSuite
-	repo        *charmrepo.LocalRepository
+	repo        charmrepo.Interface
+	repoPath    string
 	charmsPath  string
 	bundlesPath string
 }
@@ -27,10 +28,12 @@ var _ = gc.Suite(&LocalRepoSuite{})
 
 func (s *LocalRepoSuite) SetUpTest(c *gc.C) {
 	s.FakeHomeSuite.SetUpTest(c)
-	root := c.MkDir()
-	s.repo = &charmrepo.LocalRepository{Path: root}
-	s.bundlesPath = filepath.Join(root, "bundle")
-	s.charmsPath = filepath.Join(root, "quantal")
+	s.repoPath = c.MkDir()
+	var err error
+	s.repo, err = charmrepo.NewLocalRepository(s.repoPath)
+	c.Assert(err, jc.ErrorIsNil)
+	s.bundlesPath = filepath.Join(s.repoPath, "bundle")
+	s.charmsPath = filepath.Join(s.repoPath, "quantal")
 	c.Assert(os.Mkdir(s.bundlesPath, 0777), jc.ErrorIsNil)
 	c.Assert(os.Mkdir(s.charmsPath, 0777), jc.ErrorIsNil)
 }
@@ -48,7 +51,7 @@ func (s *LocalRepoSuite) addBundleDir(name string) string {
 }
 
 func (s *LocalRepoSuite) checkNotFoundErr(c *gc.C, err error, charmURL *charm.URL) {
-	expect := `entity not found in "` + s.repo.Path + `": ` + charmURL.String()
+	expect := `entity not found in "` + s.repoPath + `": ` + charmURL.String()
 	c.Check(err, gc.ErrorMatches, expect)
 }
 
@@ -58,71 +61,28 @@ func (s *LocalRepoSuite) TestMissingCharm(c *gc.C) {
 	} {
 		c.Logf("test %d: %s", i, str)
 		charmURL := charm.MustParseURL(str)
-		_, err := charmrepo.Latest(s.repo, charmURL)
-		s.checkNotFoundErr(c, err, charmURL)
-		_, err = s.repo.Get(charmURL)
+		_, err := s.repo.Get(charmURL)
 		s.checkNotFoundErr(c, err, charmURL)
 	}
 }
 
 func (s *LocalRepoSuite) TestMissingRepo(c *gc.C) {
-	c.Assert(os.RemoveAll(s.repo.Path), gc.IsNil)
-	_, err := charmrepo.Latest(s.repo, charm.MustParseURL("local:quantal/zebra"))
+	c.Assert(os.RemoveAll(s.repoPath), gc.IsNil)
+	_, err := s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
+	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
+	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
+	c.Assert(ioutil.WriteFile(s.repoPath, nil, 0666), gc.IsNil)
 	_, err = s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
-	c.Assert(ioutil.WriteFile(s.repo.Path, nil, 0666), gc.IsNil)
-	_, err = charmrepo.Latest(s.repo, charm.MustParseURL("local:quantal/zebra"))
-	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
-	_, err = s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
-	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
-	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
-	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
-}
-
-func (s *LocalRepoSuite) TestMultipleVersions(c *gc.C) {
-	charmURL := charm.MustParseURL("local:quantal/upgrade")
-	s.addCharmDir("upgrade1")
-	rev, err := charmrepo.Latest(s.repo, charmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(rev, gc.Equals, 1)
-	ch, err := s.repo.Get(charmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ch.Revision(), gc.Equals, 1)
-
-	s.addCharmDir("upgrade2")
-	rev, err = charmrepo.Latest(s.repo, charmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(rev, gc.Equals, 2)
-	ch, err = s.repo.Get(charmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ch.Revision(), gc.Equals, 2)
-
-	revCharmURL := charmURL.WithRevision(1)
-	rev, err = charmrepo.Latest(s.repo, revCharmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(rev, gc.Equals, 2)
-	ch, err = s.repo.Get(revCharmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(ch.Revision(), gc.Equals, 1)
-
-	badRevCharmURL := charmURL.WithRevision(33)
-	rev, err = charmrepo.Latest(s.repo, badRevCharmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(rev, gc.Equals, 2)
-	_, err = s.repo.Get(badRevCharmURL)
-	s.checkNotFoundErr(c, err, badRevCharmURL)
 }
 
 func (s *LocalRepoSuite) TestCharmArchive(c *gc.C) {
 	charmURL := charm.MustParseURL("local:quantal/dummy")
 	s.addCharmArchive("dummy")
 
-	rev, err := charmrepo.Latest(s.repo, charmURL)
-	c.Assert(err, gc.IsNil)
-	c.Assert(rev, gc.Equals, 1)
 	ch, err := s.repo.Get(charmURL)
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Revision(), gc.Equals, 1)
@@ -164,8 +124,6 @@ func (s *LocalRepoSuite) TestIgnoresUnpromisingNames(c *gc.C) {
 	charmURL := charm.MustParseURL("local:quantal/dummy")
 
 	_, err = s.repo.Get(charmURL)
-	s.checkNotFoundErr(c, err, charmURL)
-	_, err = charmrepo.Latest(s.repo, charmURL)
 	s.checkNotFoundErr(c, err, charmURL)
 	c.Assert(c.GetTestLog(), gc.Equals, "")
 }
@@ -233,7 +191,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		url, err := s.repo.Resolve(test.id)
 		if test.err != "" {
 			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(url, gc.IsNil)
