@@ -1,7 +1,7 @@
 name: new-charm-with-multi-series
 summary: "K/V storage engine"
 description: "Scalable K/V Store in Erlang with Clocks :-)"
-supported-series:
+series:
   - precise
   - trusty
 provides:

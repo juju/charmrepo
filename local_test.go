@@ -18,8 +18,7 @@ import (
 
 type LocalRepoSuite struct {
 	gitjujutesting.FakeHomeSuite
-	repo        charmrepo.Interface
-	repoPath    string
+	repo        *charmrepo.LocalRepository
 	charmsPath  string
 	bundlesPath string
 }
@@ -28,12 +27,10 @@ var _ = gc.Suite(&LocalRepoSuite{})
 
 func (s *LocalRepoSuite) SetUpTest(c *gc.C) {
 	s.FakeHomeSuite.SetUpTest(c)
-	s.repoPath = c.MkDir()
-	var err error
-	s.repo, err = charmrepo.NewLocalRepository(s.repoPath)
-	c.Assert(err, jc.ErrorIsNil)
-	s.bundlesPath = filepath.Join(s.repoPath, "bundle")
-	s.charmsPath = filepath.Join(s.repoPath, "quantal")
+	root := c.MkDir()
+	s.repo = &charmrepo.LocalRepository{Path: root}
+	s.bundlesPath = filepath.Join(root, "bundle")
+	s.charmsPath = filepath.Join(root, "quantal")
 	c.Assert(os.Mkdir(s.bundlesPath, 0777), jc.ErrorIsNil)
 	c.Assert(os.Mkdir(s.charmsPath, 0777), jc.ErrorIsNil)
 }
@@ -51,7 +48,7 @@ func (s *LocalRepoSuite) addBundleDir(name string) string {
 }
 
 func (s *LocalRepoSuite) checkNotFoundErr(c *gc.C, err error, charmURL *charm.URL) {
-	expect := `entity not found in "` + s.repoPath + `": ` + charmURL.String()
+	expect := `entity not found in "` + s.repo.Path + `": ` + charmURL.String()
 	c.Check(err, gc.ErrorMatches, expect)
 }
 
@@ -67,12 +64,12 @@ func (s *LocalRepoSuite) TestMissingCharm(c *gc.C) {
 }
 
 func (s *LocalRepoSuite) TestMissingRepo(c *gc.C) {
-	c.Assert(os.RemoveAll(s.repoPath), gc.IsNil)
+	c.Assert(os.RemoveAll(s.repo.Path), gc.IsNil)
 	_, err := s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
-	c.Assert(ioutil.WriteFile(s.repoPath, nil, 0666), gc.IsNil)
+	c.Assert(ioutil.WriteFile(s.repo.Path, nil, 0666), gc.IsNil)
 	_, err = s.repo.Get(charm.MustParseURL("local:quantal/zebra"))
 	c.Assert(err, gc.ErrorMatches, `no repository found at ".*"`)
 	_, err = s.repo.GetBundle(charm.MustParseURL("local:bundle/wordpress-simple"))
@@ -191,7 +188,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(test.id)
+		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
 			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(url, gc.IsNil)

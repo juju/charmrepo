@@ -233,11 +233,7 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(curl string) (*charm.URL, error) {
-	ref, err := charm.ParseReference(curl)
-	if err != nil {
-		return nil, err
-	}
+func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 	var result struct {
 		Id params.IdResponse
 	}

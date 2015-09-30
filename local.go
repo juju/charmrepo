@@ -14,36 +14,32 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
-// legacyLocalRepository represents a local directory containing subdirectories
+// LocalRepository represents a local directory containing subdirectories
 // named after an Ubuntu series, each of which contains charms targeted for
 // that series. For example:
 //
 //   /path/to/repository/oneiric/mongodb/
 //   /path/to/repository/precise/mongodb.charm
 //   /path/to/repository/precise/wordpress/
-type legacyLocalRepository struct {
+type LocalRepository struct {
 	Path string
 }
 
-var _ Interface = (*legacyLocalRepository)(nil)
+var _ Interface = (*LocalRepository)(nil)
 
-// newLocalRepository creates and return a new local Juju repository pointing
+// NewLocalRepository creates and return a new local Juju repository pointing
 // to the given local path.
-func newLocalRepository(path string) (Interface, error) {
+func NewLocalRepository(path string) (Interface, error) {
 	if path == "" {
 		return nil, errgo.New("path to local repository not specified")
 	}
-	return &legacyLocalRepository{
+	return &LocalRepository{
 		Path: path,
 	}, nil
 }
 
 // Resolve implements Interface.Resolve.
-func (r *legacyLocalRepository) Resolve(curl string) (*charm.URL, error) {
-	ref, err := charm.ParseReference(curl)
-	if err != nil {
-		return nil, err
-	}
+func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.URL, error) {
 	if ref.Series == "" {
 		return nil, errgo.Newf("no series specified for %s", ref)
 	}
@@ -69,7 +65,7 @@ func (r *legacyLocalRepository) Resolve(curl string) (*charm.URL, error) {
 // Latest implements Interface.Latest by finding the
 // latest revision of each of the given charm URLs in
 // the local repository.
-func (r *legacyLocalRepository) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
+func (r *LocalRepository) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 	result := make([]CharmRevision, len(curls))
 	for i, curl := range curls {
 		ch, err := r.Get(curl.WithRevision(-1))
@@ -92,7 +88,7 @@ func mightBeCharm(info os.FileInfo) bool {
 // Get returns a charm matching curl, if one exists. If curl has a revision of
 // -1, it returns the latest charm that matches curl. If multiple candidates
 // satisfy the foregoing, the first one encountered will be returned.
-func (r *legacyLocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
+func (r *LocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
 	if err := r.checkUrlAndPath(curl); err != nil {
 		return nil, err
 	}
@@ -134,7 +130,7 @@ func (r *legacyLocalRepository) Get(curl *charm.URL) (charm.Charm, error) {
 }
 
 // GetBundle implements Interface.GetBundle.
-func (r *legacyLocalRepository) GetBundle(curl *charm.URL) (charm.Bundle, error) {
+func (r *LocalRepository) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 	if err := r.checkUrlAndPath(curl); err != nil {
 		return nil, err
 	}
@@ -160,7 +156,7 @@ func (r *legacyLocalRepository) GetBundle(curl *charm.URL) (charm.Bundle, error)
 
 // checkUrlAndPath checks that the given URL represents a local entity and that
 // the repository path exists.
-func (r *legacyLocalRepository) checkUrlAndPath(curl *charm.URL) error {
+func (r *LocalRepository) checkUrlAndPath(curl *charm.URL) error {
 	if curl.Schema != "local" {
 		return fmt.Errorf("local repository got URL with non-local schema: %q", curl)
 	}

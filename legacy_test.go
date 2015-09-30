@@ -392,15 +392,11 @@ func (s *legacyCharmStoreSuite) TestInferRepository(c *gc.C) {
 		c.Assert(err, gc.IsNil)
 		repo, err := charmrepo.LegacyInferRepository(ref, "/some/path")
 		c.Assert(err, gc.IsNil)
-		if local, ok := charmrepo.MaybeLocalRepository(repo); ok {
-			c.Assert(local.Path, gc.Equals, t.path)
-		} else {
-			switch repo := repo.(type) {
-			case *charmrepo.LegacyCharmStore:
-				c.Assert(repo.BaseURL, gc.Equals, "https://store.juju.ubuntu.com")
-			default:
-				c.Fatal("unknown repository type")
-			}
+		switch repo := repo.(type) {
+		case *charmrepo.LocalRepository:
+			c.Assert(repo.Path, gc.Equals, t.path)
+		default:
+			c.Assert(repo, gc.Equals, charmrepo.LegacyStore)
 		}
 	}
 	ref, err := charm.ParseReference("local:whatever")

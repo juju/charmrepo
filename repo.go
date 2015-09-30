@@ -7,10 +7,8 @@ package charmrepo
 
 import (
 	"fmt"
-	"os"
 
 	"github.com/juju/loggo"
-	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
@@ -25,12 +23,11 @@ type Interface interface {
 	GetBundle(curl *charm.URL) (charm.Bundle, error)
 
 	// Resolve resolves the series and revision of the given entity
-	// reference. How the reference is interpreted is implementation
-	// dependent. In the case of the charm store, if the series is
-	// not specified, it may be resolved by the store or rejected.
-	// After the series is resolved, if the revision is not specified,
-	// it will be resolved to the latest available revision for that series.
-	Resolve(ref string) (*charm.URL, error)
+	// reference. If the series is not specified, it may be resolved
+	// by the charm store or rejected. After the series is resolved,
+	// if the revision is not specified, it will be resolved to the latest
+	// available revision for that series.
+	Resolve(ref *charm.Reference) (*charm.URL, error)
 }
 
 // Latest returns the latest revision of the charm referenced by curl, regardless
@@ -55,26 +52,13 @@ func Latest(repo *CharmStore, curl *charm.URL) (int, error) {
 // or bundle reference.
 // Charm store references will use the provided parameters.
 // Local references will use the provided path.
-func InferRepository(curlStr string, charmStoreParams NewCharmStoreParams, localRepoPath string) (Interface, error) {
-	// First try and interpret as a charm URL.
-	if ref, err := charm.ParseReference(curlStr); err == nil {
-		switch ref.Schema {
-		case "cs":
-			return NewCharmStore(charmStoreParams), nil
-		case "local":
-			return newLocalRepository(localRepoPath)
-		default:
-			// TODO fix this error message to reference bundles too?
-			return nil, errgo.Newf("unknown schema for charm reference %q", ref)
-		}
+func InferRepository(ref *charm.Reference, charmStoreParams NewCharmStoreParams, localRepoPath string) (Interface, error) {
+	switch ref.Schema {
+	case "cs":
+		return NewCharmStore(charmStoreParams), nil
+	case "local":
+		return NewLocalRepository(localRepoPath)
 	}
-	// We may have been passed in the path to a single charm or bundle.
-	ok, err := pathContainsCharmOrBundle(curlStr)
-	if ok {
-		return newCharmPath(curlStr)
-	}
-	if os.IsNotExist(errgo.Cause(err)) {
-		err = errgo.Newf("not a valid charm path: %v", curlStr)
-	}
-	return nil, err
+	// TODO fix this error message to reference bundles too?
+	return nil, fmt.Errorf("unknown schema for charm reference %q", ref)
 }

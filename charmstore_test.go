@@ -552,7 +552,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(test.id)
+		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
 			c.Assert(err.Error(), gc.Equals, test.err)
 			c.Assert(url, gc.IsNil)
