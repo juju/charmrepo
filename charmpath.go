@@ -59,7 +59,7 @@ func (r *charmPath) Charm(series string) (charm.Charm, *charm.URL, error) {
 	if series == "" && len(meta.Series) == 0 {
 		return nil, nil, errgo.Newf("series not specified and charm does not define any")
 	}
-	seriesToUse, err := charm.SeriesToUse(series, meta.Series)
+	seriesToUse, err := charm.SeriesForCharm(series, meta.Series)
 	if err != nil {
 		return nil, nil, err
 	}
