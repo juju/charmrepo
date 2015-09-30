@@ -1,10 +1,9 @@
-name: new-charm-with-multi-series
+name: bad-charm-with-multi-series
 summary: "K/V storage engine"
 description: "Scalable K/V Store in Erlang with Clocks :-)"
 series:
   - precise
   - trusty
-  - quantal
 provides:
   endpoint:
     interface: http

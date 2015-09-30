@@ -145,6 +145,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	s.addCharmDir("wordpress")
 	s.addCharmDir("riak")
 	s.addCharmDir("multi-series")
+	s.addCharmDir("multi-series-bad")
 
 	// Define the tests to be run.
 	tests := []struct {
@@ -173,7 +174,10 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	}, {
 		id:     "local:quantal/new-charm-with-multi-series",
 		url:    "local:quantal/new-charm-with-multi-series-7",
-		series: []string{"precise", "trusty"},
+		series: []string{"precise", "trusty", "quantal"},
+	}, {
+		id:  "local:quantal/bad-charm-with-multi-series",
+		err: `series \"quantal\" not supported by charm, supported series are: precise,trusty`,
 	}, {
 		id:  "local:bundle/openstack",
 		url: "local:bundle/openstack-0",

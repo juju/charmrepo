@@ -53,34 +53,20 @@ func NewCharmPath(path string) (CharmPath, error) {
 	}, nil
 }
 
-func validSeries(series string, supportedSeries []string) bool {
-	if series == "" || len(supportedSeries) == 0 {
-		return true
-	}
-	for _, s := range supportedSeries {
-		if s == series {
-			return true
-		}
-	}
-	return false
-}
-
 // Charm is defined on CharmPath.
 func (r *charmPath) Charm(series string) (charm.Charm, *charm.URL, error) {
 	meta := r.CharmInfo.Meta()
 	if series == "" && len(meta.Series) == 0 {
 		return nil, nil, errgo.Newf("series not specified and charm does not define any")
 	}
-	if !validSeries(series, meta.Series) {
-		return nil, nil, errgo.Newf("series %q not supported by charm", series)
-	}
-	if series == "" {
-		series = meta.Series[0]
+	seriesToUse, err := charm.SeriesToUse(series, meta.Series)
+	if err != nil {
+		return nil, nil, err
 	}
 	url := &charm.URL{
 		Schema:   "local",
 		Name:     r.Name,
-		Series:   series,
+		Series:   seriesToUse,
 		Revision: r.CharmInfo.Revision(),
 	}
 	return r.CharmInfo, url, nil

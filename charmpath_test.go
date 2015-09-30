@@ -99,7 +99,7 @@ func (s *charmPathSuite) TestUnsupportedSeries(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	_, _, err = path.Charm("wily")
-	c.Assert(err, gc.ErrorMatches, `series "wily" not supported by charm`)
+	c.Assert(err, gc.ErrorMatches, `series "wily" not supported by charm, supported series are.*`)
 }
 
 func (s *charmPathSuite) TestFindsSymlinks(c *gc.C) {
