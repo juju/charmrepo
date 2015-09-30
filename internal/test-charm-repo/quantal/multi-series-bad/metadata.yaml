@@ -1,6 +1,8 @@
 name: bad-charm-with-multi-series
 summary: "K/V storage engine"
-description: "Scalable K/V Store in Erlang with Clocks :-)"
+description: "An example of an charm which exists in a repo under
+the quantal series but which declares it only supports precise and
+trusty."
 series:
   - precise
   - trusty

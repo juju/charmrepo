@@ -22,11 +22,14 @@ type Interface interface {
 	// GetBundle returns the bundle referenced by curl.
 	GetBundle(curl *charm.URL) (charm.Bundle, error)
 
-	// Resolve resolves the series and revision of the given entity
-	// reference. If the series is not specified, it may be resolved
-	// by the charm store or rejected. After the series is resolved,
-	// if the revision is not specified, it will be resolved to the latest
-	// available revision for that series.
+	// Resolve resolves revision of the given entity reference and
+	// in addition, returns which series the entity may declare it
+	// supports. If the series is not specified, the caller may pick
+	// a series from those supported by the entity. If a series is
+	// specified and it is not supported, an error is returned.
+	// If the revision is not specified, it will be resolved to the
+	// latest available revision for that entity, possibly accounting
+	// for series if it is specified.
 	// The second return value holds the list of possible series
 	// supported by the entity, with the preferred series first.
 	Resolve(ref *charm.Reference) (*charm.URL, []string, error)
