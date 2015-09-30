@@ -233,7 +233,7 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, []string, error) {
 	var result struct {
 		Id params.IdResponse
 	}
@@ -247,15 +247,16 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 			case "":
 				etype = "entity"
 			}
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
+			return nil, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
+		return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
 	url, err := result.Id.Id.URL("")
 	if err != nil {
-		return nil, errgo.Notef(err, "cannot make fully resolved entity URL from %s", url)
+		return nil, nil, errgo.Notef(err, "cannot make fully resolved entity URL from %s", url)
 	}
-	return url, nil
+	// TODO(wallyworld) - return supported series
+	return url, nil, nil
 }
 
 // URL returns the root endpoint URL of the charm store.

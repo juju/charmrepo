@@ -144,12 +144,14 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	s.addCharmDir("upgrade2")
 	s.addCharmDir("wordpress")
 	s.addCharmDir("riak")
+	s.addCharmDir("multi-series")
 
 	// Define the tests to be run.
 	tests := []struct {
-		id  string
-		url string
-		err string
+		id     string
+		url    string
+		series []string
+		err    string
 	}{{
 		id:  "local:quantal/upgrade",
 		url: "local:quantal/upgrade-2",
@@ -168,6 +170,10 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	}, {
 		id:  "local:quantal/wordpress-2",
 		url: "local:quantal/wordpress-2",
+	}, {
+		id:     "local:quantal/new-charm-with-multi-series",
+		url:    "local:quantal/new-charm-with-multi-series-7",
+		series: []string{"precise", "trusty"},
 	}, {
 		id:  "local:bundle/openstack",
 		url: "local:bundle/openstack-0",
@@ -188,7 +194,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		url, series, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
 			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(url, gc.IsNil)
@@ -196,6 +202,7 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 		}
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Assert(series, jc.DeepEquals, test.series)
 	}
 }
 

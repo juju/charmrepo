@@ -27,7 +27,9 @@ type Interface interface {
 	// by the charm store or rejected. After the series is resolved,
 	// if the revision is not specified, it will be resolved to the latest
 	// available revision for that series.
-	Resolve(ref *charm.Reference) (*charm.URL, error)
+	// The second return value holds the list of possible series
+	// supported by the entity, with the preferred series first.
+	Resolve(ref *charm.Reference) (*charm.URL, []string, error)
 }
 
 // Latest returns the latest revision of the charm referenced by curl, regardless
