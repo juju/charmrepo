@@ -40,7 +40,7 @@ func (s *charmPathSuite) TestInvalidPath(c *gc.C) {
 
 func (s *charmPathSuite) TestNoCharmAtPath(c *gc.C) {
 	_, err := charmrepo.NewCharmPath(c.MkDir())
-	c.Assert(err, gc.ErrorMatches, `no charm found at ".*"`)
+	c.Assert(err, gc.ErrorMatches, "charm not found.*")
 }
 
 func (s *charmPathSuite) TestCharm(c *gc.C) {

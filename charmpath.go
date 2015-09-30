@@ -42,7 +42,7 @@ func NewCharmPath(path string) (CharmPath, error) {
 	ch, err := charm.ReadCharm(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, errgo.Newf("no charm found at %q", path)
+			return nil, CharmNotFound(path)
 		}
 		return nil, err
 	}
