@@ -21,7 +21,7 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 	}
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
-		return nil, nil, errgo.Newf("path %q does not exist", path)
+		return nil, nil, os.ErrNotExist
 	}
 	ch, err := charm.ReadCharm(path)
 	if err != nil {

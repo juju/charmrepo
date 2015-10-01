@@ -35,7 +35,7 @@ func (s *bundlePathSuite) TestNoPath(c *gc.C) {
 
 func (s *bundlePathSuite) TestInvalidPath(c *gc.C) {
 	_, _, err := charmrepo.NewBundleAtPath("foo")
-	c.Assert(err, gc.ErrorMatches, `path "foo" does not exist`)
+	c.Assert(err, gc.Equals, os.ErrNotExist)
 }
 
 func (s *bundlePathSuite) TestNoBundleAtPath(c *gc.C) {

@@ -35,7 +35,7 @@ func (s *charmPathSuite) TestNoPath(c *gc.C) {
 
 func (s *charmPathSuite) TestInvalidPath(c *gc.C) {
 	_, _, err := charmrepo.NewCharmAtPath("foo", "trusty")
-	c.Assert(err, gc.ErrorMatches, `path "foo" does not exist`)
+	c.Assert(err, gc.Equals, os.ErrNotExist)
 }
 
 func (s *charmPathSuite) TestNoCharmAtPath(c *gc.C) {
