@@ -11,7 +11,8 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
-// NewBundleAtPath creates and returns a bundle at a given path.
+// NewBundleAtPath creates and returns a bundle at a given path,
+// and a URL that describes it.
 func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 	if path == "" {
 		return nil, nil, errgo.New("path to bundle not specified")
