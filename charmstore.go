@@ -57,7 +57,7 @@ type NewCharmStoreParams struct {
 // The errors returned from the interface methods will
 // preserve the causes returned from the underlying csclient
 // methods.
-func NewCharmStore(p NewCharmStoreParams) Interface {
+func NewCharmStore(p NewCharmStoreParams) *CharmStore {
 	return &CharmStore{
 		client: csclient.New(csclient.Params{
 			URL:          p.URL,
@@ -233,7 +233,7 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.Reference, []string, error) {
 	var result struct {
 		Id params.IdResponse
 	}
@@ -245,17 +245,13 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 			case "bundle":
 				etype = "bundle"
 			case "":
-				etype = "entity"
+				etype = "charm or bundle"
 			}
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
+			return nil, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
+		return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
-	url, err := result.Id.Id.URL("")
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make fully resolved entity URL from %s", url)
-	}
-	return url, nil
+	return result.Id.Id, nil, nil
 }
 
 // URL returns the root endpoint URL of the charm store.
@@ -278,7 +274,7 @@ const JujuMetadataHTTPHeader = "Juju-Metadata"
 
 // WithJujuAttrs returns a repository Interface with the Juju metadata
 // attributes set.
-func (s *CharmStore) WithJujuAttrs(attrs map[string]string) Interface {
+func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	newRepo := *s
 	header := make(http.Header)
 	for k, v := range attrs {

@@ -56,8 +56,10 @@ func (s *legacyCharmStoreSuite) TearDownSuite(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestMissing(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/missing")
 	expect := `charm not found: cs:series/missing`
-	_, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(err, gc.ErrorMatches, expect)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Err, gc.ErrorMatches, expect)
 	_, err = s.store.Get(charmURL)
 	c.Assert(err, gc.ErrorMatches, expect)
 }
@@ -65,8 +67,10 @@ func (s *legacyCharmStoreSuite) TestMissing(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestError(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/borken")
 	expect := `charm info errors for "cs:series/borken": badness`
-	_, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(err, gc.ErrorMatches, expect)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Err, gc.ErrorMatches, expect)
 	_, err = s.store.Get(charmURL)
 	c.Assert(err, gc.ErrorMatches, expect)
 }
@@ -74,8 +78,10 @@ func (s *legacyCharmStoreSuite) TestError(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestWarning(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/unwise")
 	expect := `.* WARNING juju.charm.charmrepo charm store reports for "cs:series/unwise": foolishness` + "\n"
-	r, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(r, gc.Equals, 23)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Revision, gc.Equals, 23)
 	c.Assert(err, gc.IsNil)
 	c.Assert(c.GetTestLog(), gc.Matches, expect)
 	ch, err := s.store.Get(charmURL)

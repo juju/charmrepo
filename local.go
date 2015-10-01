@@ -39,43 +39,37 @@ func NewLocalRepository(path string) (Interface, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.Reference, []string, error) {
 	if ref.Series == "" {
-		return nil, errgo.Newf("no series specified for %s", ref)
+		return nil, nil, errgo.Newf("no series specified for %s", ref)
 	}
 	u, err := ref.URL("")
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if ref.Revision != -1 {
-		return u, nil
+		return u.Reference(), nil, nil
 	}
 	if ref.Series == "bundle" {
 		// Bundles do not have revision files and the revision is not included
 		// in metadata. For this reason, local bundles always have revision 0.
-		return u.WithRevision(0), nil
+		return u.WithRevision(0).Reference(), nil, nil
 	}
 	ch, err := r.Get(u)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return u.WithRevision(ch.Revision()), nil
-}
-
-// Latest implements Interface.Latest by finding the
-// latest revision of each of the given charm URLs in
-// the local repository.
-func (r *LocalRepository) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
-	result := make([]CharmRevision, len(curls))
-	for i, curl := range curls {
-		ch, err := r.Get(curl.WithRevision(-1))
-		if err == nil {
-			result[i].Revision = ch.Revision()
-		} else {
-			result[i].Err = err
-		}
+	// This is strictly speaking unnecessary, but just in case a bad charm is
+	// used locally, we'll check the series.
+	_, err = charm.SeriesForCharm(ref.Series, ch.Meta().Series)
+	if err != nil {
+		return nil, nil, err
 	}
-	return result, nil
+	// We return nil for supported series because even though a charm in a local
+	// repository may declare series, it doesn't make sense because charms are
+	// expected to be for a single series only in the repository. The local
+	// repository concept is deprecated for multi series charms.
+	return u.WithRevision(ch.Revision()).Reference(), nil, nil
 }
 
 func mightBeCharm(info os.FileInfo) bool {

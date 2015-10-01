@@ -77,22 +77,23 @@ func (s *LegacyCharmStore) get(url string) (resp *http.Response, err error) {
 }
 
 // Resolve canonicalizes charm URLs any implied series in the reference.
-func (s *LegacyCharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *LegacyCharmStore) Resolve(ref *charm.Reference) (*charm.Reference, []string, error) {
 	infos, err := s.Info(ref)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(infos) == 0 {
-		return nil, fmt.Errorf("missing response when resolving charm URL: %q", ref)
+		return nil, nil, fmt.Errorf("missing response when resolving charm URL: %q", ref)
 	}
 	if infos[0].CanonicalURL == "" {
-		return nil, fmt.Errorf("cannot resolve charm URL: %q", ref)
+		return nil, nil, fmt.Errorf("cannot resolve charm URL: %q", ref)
 	}
 	curl, err := charm.ParseURL(infos[0].CanonicalURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return curl, nil
+	// Legacy store does not support returning the supported series.
+	return curl.Reference(), nil, nil
 }
 
 // Info returns details for all the specified charms in the charm store.
