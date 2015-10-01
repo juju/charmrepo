@@ -29,25 +29,23 @@ func (s *bundlePathSuite) cloneCharmDir(path, name string) string {
 }
 
 func (s *bundlePathSuite) TestNoPath(c *gc.C) {
-	_, err := charmrepo.NewBundlePath("")
+	_, _, err := charmrepo.NewBundleAtPath("")
 	c.Assert(err, gc.ErrorMatches, "path to bundle not specified")
 }
 
 func (s *bundlePathSuite) TestInvalidPath(c *gc.C) {
-	_, err := charmrepo.NewBundlePath("foo")
+	_, _, err := charmrepo.NewBundleAtPath("foo")
 	c.Assert(err, gc.ErrorMatches, `path "foo" does not exist`)
 }
 
 func (s *bundlePathSuite) TestNoBundleAtPath(c *gc.C) {
-	_, err := charmrepo.NewBundlePath(c.MkDir())
+	_, _, err := charmrepo.NewBundleAtPath(c.MkDir())
 	c.Assert(err, gc.ErrorMatches, `no bundle found at ".*"`)
 }
 
 func (s *bundlePathSuite) TestGetBundle(c *gc.C) {
 	bundleDir := filepath.Join(TestCharms.Path(), "bundle", "openstack")
-	path, err := charmrepo.NewBundlePath(bundleDir)
-	c.Assert(err, jc.ErrorIsNil)
-	b, url := path.Bundle()
+	b, url, err := charmrepo.NewBundleAtPath(bundleDir)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(b.Data(), jc.DeepEquals, TestCharms.BundleDir("openstack").Data())
 	c.Assert(url, gc.DeepEquals, charm.MustParseURL("local:bundle/openstack-0"))
@@ -61,9 +59,7 @@ func (s *bundlePathSuite) TestGetBundleSymlink(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	url := charm.MustParseURL("local:bundle/wordpress-simple")
 
-	path, err := charmrepo.NewBundlePath(filepath.Join(bundlesPath, "wordpress-simple"))
-	c.Assert(err, jc.ErrorIsNil)
-	b, url := path.Bundle()
+	b, url, err := charmrepo.NewBundleAtPath(filepath.Join(bundlesPath, "wordpress-simple"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(b.Data(), jc.DeepEquals, TestCharms.BundleDir("wordpress-simple").Data())
 	c.Assert(url, gc.DeepEquals, charm.MustParseURL("local:bundle/wordpress-simple-0"))

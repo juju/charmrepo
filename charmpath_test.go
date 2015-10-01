@@ -29,28 +29,25 @@ func (s *charmPathSuite) cloneCharmDir(path, name string) string {
 }
 
 func (s *charmPathSuite) TestNoPath(c *gc.C) {
-	_, err := charmrepo.NewCharmPath("")
+	_, _, err := charmrepo.NewCharmAtPath("", "trusty")
 	c.Assert(err, gc.ErrorMatches, "path to charm not specified")
 }
 
 func (s *charmPathSuite) TestInvalidPath(c *gc.C) {
-	_, err := charmrepo.NewCharmPath("foo")
+	_, _, err := charmrepo.NewCharmAtPath("foo", "trusty")
 	c.Assert(err, gc.ErrorMatches, `path "foo" does not exist`)
 }
 
 func (s *charmPathSuite) TestNoCharmAtPath(c *gc.C) {
-	_, err := charmrepo.NewCharmPath(c.MkDir())
+	_, _, err := charmrepo.NewCharmAtPath(c.MkDir(), "trusty")
 	c.Assert(err, gc.ErrorMatches, "charm not found.*")
 }
 
 func (s *charmPathSuite) TestCharm(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "mysql")
 	s.cloneCharmDir(s.repoPath, "mysql")
-	path, err := charmrepo.NewCharmPath(charmDir)
+	ch, url, err := charmrepo.NewCharmAtPath(charmDir, "quantal")
 	c.Assert(err, jc.ErrorIsNil)
-
-	ch, url, err := path.Charm("quantal")
-	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Meta().Name, gc.Equals, "mysql")
 	c.Assert(ch.Revision(), gc.Equals, 1)
 	c.Assert(url, gc.DeepEquals, charm.MustParseURL("local:quantal/mysql-1"))
@@ -59,20 +56,14 @@ func (s *charmPathSuite) TestCharm(c *gc.C) {
 func (s *charmPathSuite) TestNoSeriesSpecified(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "mysql")
 	s.cloneCharmDir(s.repoPath, "mysql")
-	path, err := charmrepo.NewCharmPath(charmDir)
-	c.Assert(err, jc.ErrorIsNil)
-
-	_, _, err = path.Charm("")
+	_, _, err := charmrepo.NewCharmAtPath(charmDir, "")
 	c.Assert(err, gc.ErrorMatches, "series not specified and charm does not define any")
 }
 
 func (s *charmPathSuite) TestMuliSeriesDefault(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "multi-series")
 	s.cloneCharmDir(s.repoPath, "multi-series")
-	path, err := charmrepo.NewCharmPath(charmDir)
-	c.Assert(err, jc.ErrorIsNil)
-
-	ch, url, err := path.Charm("")
+	ch, url, err := charmrepo.NewCharmAtPath(charmDir, "")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Meta().Name, gc.Equals, "new-charm-with-multi-series")
 	c.Assert(ch.Revision(), gc.Equals, 7)
@@ -82,10 +73,7 @@ func (s *charmPathSuite) TestMuliSeriesDefault(c *gc.C) {
 func (s *charmPathSuite) TestMuliSeries(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "multi-series")
 	s.cloneCharmDir(s.repoPath, "multi-series")
-	path, err := charmrepo.NewCharmPath(charmDir)
-	c.Assert(err, jc.ErrorIsNil)
-
-	ch, url, err := path.Charm("trusty")
+	ch, url, err := charmrepo.NewCharmAtPath(charmDir, "trusty")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Meta().Name, gc.Equals, "new-charm-with-multi-series")
 	c.Assert(ch.Revision(), gc.Equals, 7)
@@ -95,10 +83,7 @@ func (s *charmPathSuite) TestMuliSeries(c *gc.C) {
 func (s *charmPathSuite) TestUnsupportedSeries(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "multi-series")
 	s.cloneCharmDir(s.repoPath, "multi-series")
-	path, err := charmrepo.NewCharmPath(charmDir)
-	c.Assert(err, jc.ErrorIsNil)
-
-	_, _, err = path.Charm("wily")
+	_, _, err := charmrepo.NewCharmAtPath(charmDir, "wily")
 	c.Assert(err, gc.ErrorMatches, `series "wily" not supported by charm, supported series are.*`)
 }
 
@@ -109,9 +94,7 @@ func (s *charmPathSuite) TestFindsSymlinks(c *gc.C) {
 	err := os.Symlink(realPath, linkPath)
 	c.Assert(err, gc.IsNil)
 
-	path, err := charmrepo.NewCharmPath(filepath.Join(charmsPath, "dummy"))
-	c.Assert(err, jc.ErrorIsNil)
-	ch, url, err := path.Charm("quantal")
+	ch, url, err := charmrepo.NewCharmAtPath(filepath.Join(charmsPath, "dummy"), "quantal")
 	c.Assert(err, gc.IsNil)
 	c.Assert(ch.Revision(), gc.Equals, 1)
 	c.Assert(ch.Meta().Name, gc.Equals, "dummy")

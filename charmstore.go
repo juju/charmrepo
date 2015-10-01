@@ -57,7 +57,7 @@ type NewCharmStoreParams struct {
 // The errors returned from the interface methods will
 // preserve the causes returned from the underlying csclient
 // methods.
-func NewCharmStore(p NewCharmStoreParams) Interface {
+func NewCharmStore(p NewCharmStoreParams) *CharmStore {
 	return &CharmStore{
 		client: csclient.New(csclient.Params{
 			URL:          p.URL,
@@ -279,7 +279,7 @@ const JujuMetadataHTTPHeader = "Juju-Metadata"
 
 // WithJujuAttrs returns a repository Interface with the Juju metadata
 // attributes set.
-func (s *CharmStore) WithJujuAttrs(attrs map[string]string) Interface {
+func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	newRepo := *s
 	header := make(http.Header)
 	for k, v := range attrs {

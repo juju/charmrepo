@@ -35,24 +35,6 @@ type Interface interface {
 	Resolve(ref *charm.Reference) (*charm.URL, []string, error)
 }
 
-// Latest returns the latest revision of the charm referenced by curl, regardless
-// of the revision set on each curl.
-// This is a helper which calls the bulk method and unpacks a single result.
-func Latest(repo *CharmStore, curl *charm.URL) (int, error) {
-	revs, err := repo.Latest(curl)
-	if err != nil {
-		return 0, err
-	}
-	if len(revs) != 1 {
-		return 0, fmt.Errorf("expected 1 result, got %d", len(revs))
-	}
-	rev := revs[0]
-	if rev.Err != nil {
-		return 0, rev.Err
-	}
-	return rev.Revision, nil
-}
-
 // InferRepository returns a charm repository inferred from the provided charm
 // or bundle reference.
 // Charm store references will use the provided parameters.

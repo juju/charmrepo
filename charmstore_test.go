@@ -40,12 +40,12 @@ func (s *charmStoreSuite) TestURL(c *gc.C) {
 	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
 		URL: "https://1.2.3.4/charmstore",
 	})
-	c.Assert(repo.(*charmrepo.CharmStore).URL(), gc.Equals, "https://1.2.3.4/charmstore")
+	c.Assert(repo.URL(), gc.Equals, "https://1.2.3.4/charmstore")
 }
 
 func (s *charmStoreSuite) TestDefaultURL(c *gc.C) {
 	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{})
-	c.Assert(repo.(*charmrepo.CharmStore).URL(), gc.Equals, csclient.ServerURL)
+	c.Assert(repo.URL(), gc.Equals, csclient.ServerURL)
 }
 
 type charmStoreBaseSuite struct {
@@ -53,7 +53,7 @@ type charmStoreBaseSuite struct {
 	srv     *httptest.Server
 	client  *csclient.Client
 	handler charmstore.HTTPCloseHandler
-	repo    charmrepo.Interface
+	repo    *charmrepo.CharmStore
 }
 
 var _ = gc.Suite(&charmStoreBaseSuite{})
@@ -282,7 +282,7 @@ func (s *charmStoreRepoSuite) TestGetWithTestMode(c *gc.C) {
 
 	// Use a repo with test mode enabled to download a charm a couple of
 	// times, and check the downloads count is not increased.
-	repo := s.repo.(*charmrepo.CharmStore).WithTestMode()
+	repo := s.repo.WithTestMode()
 	_, err := repo.Get(url)
 	c.Assert(err, jc.ErrorIsNil)
 	_, err = repo.Get(url)
@@ -311,7 +311,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
 
 	// Make a second request after setting Juju attrs.
-	repo = repo.(*charmrepo.CharmStore).WithJujuAttrs(map[string]string{
+	repo = repo.WithJujuAttrs(map[string]string{
 		"k1": "v1",
 		"k2": "v2",
 	})
@@ -322,7 +322,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 	c.Assert(values, jc.DeepEquals, []string{"k1=v1", "k2=v2"})
 
 	// Make a third request after restoring empty attrs.
-	repo = repo.(*charmrepo.CharmStore).WithJujuAttrs(nil)
+	repo = repo.WithJujuAttrs(nil)
 	_, err = repo.Get(url)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
@@ -496,7 +496,7 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		revs, err := s.repo.(*charmrepo.CharmStore).Latest(test.urls...)
+		revs, err := s.repo.Latest(test.urls...)
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(revs, jc.DeepEquals, test.revs)
 	}
