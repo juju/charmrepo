@@ -22,17 +22,14 @@ type Interface interface {
 	// GetBundle returns the bundle referenced by curl.
 	GetBundle(curl *charm.URL) (charm.Bundle, error)
 
-	// Resolve resolves revision of the given entity reference and
-	// in addition, returns which series the entity may declare it
-	// supports. If the series is not specified, the caller may pick
-	// a series from those supported by the entity. If a series is
-	// specified and it is not supported, an error is returned.
-	// If the revision is not specified, it will be resolved to the
-	// latest available revision for that entity, possibly accounting
-	// for series if it is specified.
-	// The second return value holds the list of possible series
-	// supported by the entity, with the preferred series first.
-	Resolve(ref *charm.Reference) (*charm.URL, []string, error)
+	// Resolve resolves the given reference to a canonical form which refers
+	// unambiguously to a specific revision of an entity. If the entity
+	// is a charm that may support more than one series, canonRef.Series will
+	// be empty and supportedSeries will hold the list of series supported by
+	// the charm with the preferred series first.
+	// If ref holds a series, then Resolve will always ensure that the returned
+	// entity supports that series.
+	Resolve(ref *charm.Reference) (canonRef *charm.Reference, supportedSeries []string, err error)
 }
 
 // InferRepository returns a charm repository inferred from the provided charm

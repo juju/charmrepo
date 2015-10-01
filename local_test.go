@@ -174,9 +174,9 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	}, {
 		id:     "local:quantal/new-charm-with-multi-series",
 		url:    "local:quantal/new-charm-with-multi-series-7",
-		series: []string{"precise", "trusty", "quantal"},
+		series: []string{},
 	}, {
-		id:  "local:quantal/bad-charm-with-multi-series",
+		id:  "local:quantal/multi-series-bad",
 		err: `series \"quantal\" not supported by charm, supported series are: precise,trusty`,
 	}, {
 		id:  "local:bundle/openstack",
@@ -198,12 +198,14 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, series, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		ref, series, err := s.repo.Resolve(charm.MustParseReference(test.id))
 		if test.err != "" {
 			c.Assert(err, gc.ErrorMatches, test.err)
-			c.Assert(url, gc.IsNil)
+			c.Assert(ref, gc.IsNil)
 			continue
 		}
+		c.Assert(err, jc.ErrorIsNil)
+		url, err := ref.URL("")
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
 		c.Assert(series, jc.DeepEquals, test.series)

@@ -1,4 +1,4 @@
-name: bad-charm-with-multi-series
+name: multi-series-bad
 summary: "K/V storage engine"
 description: "An example of an charm which exists in a repo under
 the quantal series but which declares it only supports precise and
