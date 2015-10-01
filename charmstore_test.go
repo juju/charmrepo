@@ -546,7 +546,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
 	}, {
 		id:  "no-such",
-		err: `cannot resolve URL "cs:no-such": entity not found`,
+		err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
 	}}
 
 	// Run the tests.

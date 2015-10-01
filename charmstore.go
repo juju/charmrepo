@@ -245,7 +245,7 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.Reference, []string, 
 			case "bundle":
 				etype = "bundle"
 			case "":
-				etype = "entity"
+				etype = "charm or bundle"
 			}
 			return nil, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}

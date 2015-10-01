@@ -30,7 +30,7 @@ func (s *charmPathSuite) cloneCharmDir(path, name string) string {
 
 func (s *charmPathSuite) TestNoPath(c *gc.C) {
 	_, _, err := charmrepo.NewCharmAtPath("", "trusty")
-	c.Assert(err, gc.ErrorMatches, "path to charm not specified")
+	c.Assert(err, gc.ErrorMatches, "empty charm path")
 }
 
 func (s *charmPathSuite) TestInvalidPath(c *gc.C) {

@@ -27,7 +27,11 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 		}
 		return nil, nil, err
 	}
-	_, name := filepath.Split(path)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, name := filepath.Split(absPath)
 	url := &charm.URL{
 		Schema:   "local",
 		Name:     name,

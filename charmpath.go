@@ -11,13 +11,14 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
-// NewCharmAtPath returns the charm represented by this path.
-// If the series is not specified, the charm's default
-// series is used, if any. Otherwise, the series is
-// validated against those the charm declares it supports.
+// NewCharmAtPath returns the charm represented by this path,
+// and a URL that describes it. If the series is empty,
+// the charm's default series is used, if any.
+// Otherwise, the series is validated against those the
+// charm declares it supports.
 func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 	if path == "" {
-		return nil, nil, errgo.New("path to charm not specified")
+		return nil, nil, errgo.New("empty charm path")
 	}
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
@@ -30,7 +31,11 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 		}
 		return nil, nil, err
 	}
-	_, name := filepath.Split(path)
+	absPath, err := filepath.Abs(path)
+	if err != nil {
+		return nil, nil, err
+	}
+	_, name := filepath.Split(absPath)
 	meta := ch.Meta()
 	seriesToUse, err := charm.SeriesForCharm(series, meta.Series)
 	if err != nil {
