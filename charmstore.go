@@ -262,7 +262,7 @@ func (s *CharmStore) URL() string {
 // WithTestMode returns a repository Interface where test mode is enabled,
 // meaning charm store download stats are not increased when charms are
 // retrieved.
-func (s *CharmStore) WithTestMode() Interface {
+func (s *CharmStore) WithTestMode() *CharmStore {
 	newRepo := *s
 	newRepo.client.DisableStats()
 	return &newRepo
