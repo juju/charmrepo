@@ -17,6 +17,9 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 	if path == "" {
 		return nil, nil, errgo.New("path to bundle not specified")
 	}
+	if !isValidCharmOrBundlePath(path) {
+		return nil, nil, InvalidPath(path)
+	}
 	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return nil, nil, os.ErrNotExist

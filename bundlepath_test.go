@@ -34,8 +34,18 @@ func (s *bundlePathSuite) TestNoPath(c *gc.C) {
 }
 
 func (s *bundlePathSuite) TestInvalidPath(c *gc.C) {
-	_, _, err := charmrepo.NewBundleAtPath("foo")
+	_, _, err := charmrepo.NewBundleAtPath("./foo")
 	c.Assert(err, gc.Equals, os.ErrNotExist)
+}
+
+func (s *bundlePathSuite) TestRelativePath(c *gc.C) {
+	relDir := filepath.Join(TestCharms.Path(), "bundle")
+	cwd, err := os.Getwd()
+	c.Assert(err, jc.ErrorIsNil)
+	defer os.Chdir(cwd)
+	c.Assert(os.Chdir(relDir), jc.ErrorIsNil)
+	_, _, err = charmrepo.NewBundleAtPath("openstack")
+	c.Assert(charmrepo.IsInvalidPathError(err), jc.IsTrue)
 }
 
 func (s *bundlePathSuite) TestNoBundleAtPath(c *gc.C) {
