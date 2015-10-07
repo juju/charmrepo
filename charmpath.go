@@ -17,7 +17,7 @@ func mightBeCharmOrBundlePath(path string, info os.FileInfo) bool {
 		return false
 	}
 	//Exclude relative paths.
-	return strings.HasPrefix(path, ".") || strings.HasPrefix(path, string(filepath.Separator))
+	return strings.HasPrefix(path, ".") || filepath.IsAbs(path)
 }
 
 // NewCharmAtPath returns the charm represented by this path,
