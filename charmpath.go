@@ -6,10 +6,19 @@ package charmrepo
 import (
 	"os"
 	"path/filepath"
+	"strings"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 )
+
+func mightBeCharmOrBundlePath(path string, info os.FileInfo) bool {
+	if !info.IsDir() {
+		return false
+	}
+	//Exclude relative paths.
+	return strings.HasPrefix(path, ".") || strings.HasPrefix(path, string(filepath.Separator))
+}
 
 // NewCharmAtPath returns the charm represented by this path,
 // and a URL that describes it. If the series is empty,
@@ -20,9 +29,12 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 	if path == "" {
 		return nil, nil, errgo.New("empty charm path")
 	}
-	_, err := os.Stat(path)
+	fi, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return nil, nil, os.ErrNotExist
+	}
+	if !mightBeCharmOrBundlePath(path, fi) {
+		return nil, nil, InvalidPath(path)
 	}
 	ch, err := charm.ReadCharm(path)
 	if err != nil {

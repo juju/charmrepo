@@ -38,6 +38,16 @@ func (s *charmPathSuite) TestInvalidPath(c *gc.C) {
 	c.Assert(err, gc.Equals, os.ErrNotExist)
 }
 
+func (s *charmPathSuite) TestRelativePath(c *gc.C) {
+	s.cloneCharmDir(s.repoPath, "mysql")
+	cwd, err := os.Getwd()
+	c.Assert(err, jc.ErrorIsNil)
+	defer os.Chdir(cwd)
+	os.Chdir(s.repoPath)
+	_, _, err = charmrepo.NewCharmAtPath("mysql", "trusty")
+	c.Assert(charmrepo.IsInvalidPathError(err), jc.IsTrue)
+}
+
 func (s *charmPathSuite) TestNoCharmAtPath(c *gc.C) {
 	_, _, err := charmrepo.NewCharmAtPath(c.MkDir(), "trusty")
 	c.Assert(err, gc.ErrorMatches, "charm not found.*")

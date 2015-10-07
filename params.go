@@ -59,3 +59,23 @@ func CharmNotFound(url string) error {
 		msg: "charm not found: " + url,
 	}
 }
+
+// InvalidPath returns an invalidPathError.
+func InvalidPath(path string) error {
+	return &invalidPathError{path}
+}
+
+// invalidPathError represents an error indicating that the requested
+// charm or bundle path is not valid as a charm or bundle path.
+type invalidPathError struct {
+	path string
+}
+
+func (e *invalidPathError) Error() string {
+	return fmt.Sprintf("path %q can not be a relative path", e.path)
+}
+
+func IsInvalidPathError(err error) bool {
+	_, ok := err.(*invalidPathError)
+	return ok
+}
