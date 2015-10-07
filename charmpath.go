@@ -12,10 +12,7 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
-func mightBeCharmOrBundlePath(path string, info os.FileInfo) bool {
-	if !info.IsDir() {
-		return false
-	}
+func isValidCharmOrBundlePath(path string) bool {
 	//Exclude relative paths.
 	return strings.HasPrefix(path, ".") || filepath.IsAbs(path)
 }
@@ -29,12 +26,12 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 	if path == "" {
 		return nil, nil, errgo.New("empty charm path")
 	}
-	fi, err := os.Stat(path)
+	if !isValidCharmOrBundlePath(path) {
+		return nil, nil, InvalidPath(path)
+	}
+	_, err := os.Stat(path)
 	if os.IsNotExist(err) {
 		return nil, nil, os.ErrNotExist
-	}
-	if !mightBeCharmOrBundlePath(path, fi) {
-		return nil, nil, InvalidPath(path)
 	}
 	ch, err := charm.ReadCharm(path)
 	if err != nil {
