@@ -43,7 +43,7 @@ func (s *bundlePathSuite) TestRelativePath(c *gc.C) {
 	cwd, err := os.Getwd()
 	c.Assert(err, jc.ErrorIsNil)
 	defer os.Chdir(cwd)
-	os.Chdir(relDir)
+	c.Assert(os.Chdir(relDir), jc.ErrorIsNil)
 	_, _, err = charmrepo.NewBundleAtPath("openstack")
 	c.Assert(charmrepo.IsInvalidPathError(err), jc.IsTrue)
 }

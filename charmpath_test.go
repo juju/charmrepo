@@ -43,7 +43,7 @@ func (s *charmPathSuite) TestRelativePath(c *gc.C) {
 	cwd, err := os.Getwd()
 	c.Assert(err, jc.ErrorIsNil)
 	defer os.Chdir(cwd)
-	os.Chdir(s.repoPath)
+	c.Assert(os.Chdir(s.repoPath), jc.ErrorIsNil)
 	_, _, err = charmrepo.NewCharmAtPath("mysql", "trusty")
 	c.Assert(charmrepo.IsInvalidPathError(err), jc.IsTrue)
 }
