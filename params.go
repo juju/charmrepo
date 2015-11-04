@@ -60,6 +60,12 @@ func CharmNotFound(url string) error {
 	}
 }
 
+func BundleNotFound(url string) error {
+	return &NotFoundError{
+		msg: "bundle not found: " + url,
+	}
+}
+
 // InvalidPath returns an invalidPathError.
 func InvalidPath(path string) error {
 	return &invalidPathError{path}

@@ -50,7 +50,7 @@ func (s *bundlePathSuite) TestRelativePath(c *gc.C) {
 
 func (s *bundlePathSuite) TestNoBundleAtPath(c *gc.C) {
 	_, _, err := charmrepo.NewBundleAtPath(c.MkDir())
-	c.Assert(err, gc.ErrorMatches, `no bundle found at ".*"`)
+	c.Assert(err, gc.ErrorMatches, `bundle not found:.*`)
 }
 
 func (s *bundlePathSuite) TestGetBundle(c *gc.C) {

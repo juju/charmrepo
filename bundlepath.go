@@ -27,7 +27,7 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 	b, err := charm.ReadBundle(path)
 	if err != nil {
 		if os.IsNotExist(err) {
-			return nil, nil, errgo.Newf("no bundle found at %q", path)
+			return nil, nil, BundleNotFound(path)
 		}
 		return nil, nil, err
 	}
