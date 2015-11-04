@@ -91,6 +91,7 @@ var migrateTests = []struct {
 		|        wordpress:
 		|            charm: "cs:precise/wordpress-20"
 		|            num_units: 1
+		|            expose: true
 		|            options:
 		|                debug: "no"
 		|                engine: nginx
@@ -122,6 +123,7 @@ var migrateTests = []struct {
 				"wordpress": {
 					Charm:    "cs:precise/wordpress-20",
 					NumUnits: 1,
+					Expose:   true,
 					Options: map[string]interface{}{
 						"debug":      "no",
 						"engine":     "nginx",
@@ -308,6 +310,7 @@ var migrateTests = []struct {
 		|        logging:
 		|             charm: precise/logging
 		|        wordpress:
+		|            expose: on
 		|            annotations:
 		|                 foo: bar
 		|                 base: arble
@@ -319,7 +322,8 @@ var migrateTests = []struct {
 		"wordpress": {
 			Services: map[string]*charm.ServiceSpec{
 				"wordpress": {
-					Charm: "precise/wordpress",
+					Charm:  "precise/wordpress",
+					Expose: true,
 					Annotations: map[string]string{
 						"foo":  "yes",
 						"base": "arble",
@@ -339,6 +343,7 @@ var migrateTests = []struct {
 				"wordpress": {
 					Charm:    "wordpress",
 					NumUnits: 1,
+					Expose:   true,
 					Annotations: map[string]string{
 						"foo":  "bar",
 						"base": "arble",
