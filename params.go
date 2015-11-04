@@ -55,7 +55,7 @@ func entityNotFound(curl *charm.URL, repoPath string) error {
 }
 
 // CharmNotFound returns an error indicating that the
-// charm at the specified URL does not exist. 
+// charm at the specified URL does not exist.
 func CharmNotFound(url string) error {
 	return &NotFoundError{
 		msg: "charm not found: " + url,
@@ -63,7 +63,7 @@ func CharmNotFound(url string) error {
 }
 
 // BundleNotFound returns an error indicating that the
-// bundle at the specified URL does not exist. 
+// bundle at the specified URL does not exist.
 func BundleNotFound(url string) error {
 	return &NotFoundError{
 		msg: "bundle not found: " + url,

@@ -4,12 +4,14 @@
 package charmrepo_test
 
 import (
+	"io/ioutil"
 	"os"
 	"path/filepath"
 
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmrepo.v2-unstable"
 )
@@ -78,4 +80,28 @@ func (s *bundlePathSuite) TestGetBundleSymlink(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(b.Data(), jc.DeepEquals, TestCharms.BundleDir("wordpress-simple").Data())
 	c.Assert(url, gc.DeepEquals, charm.MustParseURL("local:bundle/wordpress-simple-0"))
+}
+
+func (s *bundlePathSuite) TestGetBundleLocalFile(c *gc.C) {
+	bundlePath := filepath.Join(c.MkDir(), "mybundle")
+	data := `
+services:
+  wordpress:
+    charm: wordpress
+    num_units: 1
+`[1:]
+	err := ioutil.WriteFile(bundlePath, []byte(data), 0644)
+	c.Assert(err, jc.ErrorIsNil)
+
+	bundleData, err := charmrepo.ReadBundleFile(bundlePath)
+	c.Assert(err, jc.ErrorIsNil)
+	out, err := yaml.Marshal(bundleData)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(out), jc.DeepEquals, data)
+}
+
+func (s *bundlePathSuite) TestGetBundleLocalFileNotExists(c *gc.C) {
+	bundlePath := filepath.Join(c.MkDir(), "mybundle")
+	_, err := charmrepo.ReadBundleFile(bundlePath)
+	c.Assert(err, gc.ErrorMatches, `bundle not found:.*`)
 }
