@@ -116,6 +116,7 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, err
 		newSvc := &charm.ServiceSpec{
 			Charm:       charmId,
 			NumUnits:    numUnits,
+			Expose:      svc.Expose,
 			Options:     svc.Options,
 			Annotations: svc.Annotations,
 			Constraints: svc.Constraints,
