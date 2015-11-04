@@ -54,9 +54,19 @@ func entityNotFound(curl *charm.URL, repoPath string) error {
 	return &NotFoundError{fmt.Sprintf("entity not found in %q: %s", repoPath, curl)}
 }
 
+// CharmNotFound returns an error indicating that the
+// charm at the specified URL does not exist. 
 func CharmNotFound(url string) error {
 	return &NotFoundError{
 		msg: "charm not found: " + url,
+	}
+}
+
+// BundleNotFound returns an error indicating that the
+// bundle at the specified URL does not exist. 
+func BundleNotFound(url string) error {
+	return &NotFoundError{
+		msg: "bundle not found: " + url,
 	}
 }
 
