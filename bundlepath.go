@@ -44,3 +44,17 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 	}
 	return b, url, nil
 }
+
+// ReadBundleFile attempts to read the file at path
+// and interpret it as a bundle.
+func ReadBundleFile(path string) (*charm.BundleData, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		if os.IsNotExist(err) {
+			return nil, BundleNotFound(path)
+		}
+		return nil, err
+	}
+	defer f.Close()
+	return charm.ReadBundleData(f)
+}
