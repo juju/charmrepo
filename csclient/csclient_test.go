@@ -307,11 +307,11 @@ func (s *suite) TestGetArchiveWithStatsDisabled(c *gc.C) {
 func (s *suite) TestStatsUpdate(c *gc.C) {
 	key := s.checkGetArchive(c)
 	s.checkCharmDownloads(c, key, 1)
-	err := s.client.StatsUpdate(params.StatsUpdateRequest {
+	err := s.client.StatsUpdate(params.StatsUpdateRequest{
 		Entries: []params.StatsUpdateEntry{{
 			CharmReference: charm.MustParseReference("~charmers/utopic/wordpress-42"),
-			Timestamp: time.Now(),
-			Type: params.UpdateDeploy,
+			Timestamp:      time.Now(),
+			Type:           params.UpdateDeploy,
 		}},
 	})
 	c.Assert(err, gc.IsNil)
@@ -428,7 +428,7 @@ var getArchiveWithBadResponseTests = []struct {
 		Body:          ioutil.NopCloser(strings.NewReader("")),
 		ContentLength: fakeSize,
 	},
-	expectError: `invalid entity id found in response: charm URL has invalid schema: "no:such"`,
+	expectError: `invalid entity id found in response: charm or bundle URL has invalid schema: "no:such"`,
 }, {
 	about: "partial entity id header",
 	response: &http.Response{
