@@ -314,7 +314,7 @@ func (s *LegacyCharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 	}
 	path := filepath.Join(CacheDir, charm.Quote(curl.String())+".charm")
 	if verify(path, digest) != nil {
-		store_url := s.BaseURL + "/charm/" + url.QueryEscape(curl.Path())
+		store_url := s.BaseURL + "/charm/" + curl.Path()
 		if s.testMode {
 			store_url = store_url + "?stats=0"
 		}
@@ -323,6 +323,9 @@ func (s *LegacyCharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 			return nil, err
 		}
 		defer resp.Body.Close()
+		if resp.StatusCode != http.StatusOK {
+			return nil, fmt.Errorf("bad status from request for %q: %q", store_url, resp.Status)
+		}
 		f, err := ioutil.TempFile(CacheDir, "charm-download")
 		if err != nil {
 			return nil, err
