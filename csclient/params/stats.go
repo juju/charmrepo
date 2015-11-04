@@ -5,10 +5,11 @@ package params
 
 // Define the kinds to be included in stats keys.
 const (
-	StatsArchiveDownload     = "archive-download"
-	StatsArchiveDelete       = "archive-delete"
-	StatsArchiveFailedUpload = "archive-failed-upload"
-	StatsArchiveUpload       = "archive-upload"
+	StatsArchiveDownload            = "archive-download"
+	StatsArchiveDownloadPromulgated = "archive-download-promulgated"
+	StatsArchiveDelete              = "archive-delete"
+	StatsArchiveFailedUpload        = "archive-failed-upload"
+	StatsArchiveUpload              = "archive-upload"
 	// The following kinds are in use in the legacy API.
 	StatsCharmInfo    = "charm-info"
 	StatsCharmMissing = "charm-missing"
