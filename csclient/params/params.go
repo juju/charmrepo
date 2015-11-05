@@ -123,6 +123,12 @@ type RevisionInfoResponse struct {
 	Revisions []*charm.Reference
 }
 
+// SupportedSeries holds the result of an id/meta/supported-series GET
+// request. See See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetasupported-series
+type SupportedSeriesResponse struct {
+	SupportedSeries []string
+}
+
 // BundleCount holds the result of an id/meta/bundle-unit-count
 // or bundle-machine-count GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabundle-unit-count
