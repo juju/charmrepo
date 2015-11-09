@@ -38,6 +38,11 @@ func (s *charmPathSuite) TestInvalidPath(c *gc.C) {
 	c.Assert(err, gc.Equals, os.ErrNotExist)
 }
 
+func (s *charmPathSuite) TestRepoURL(c *gc.C) {
+	_, _, err := charmrepo.NewCharmAtPath("cs:foo", "trusty")
+	c.Assert(err, gc.Equals, os.ErrNotExist)
+}
+
 func (s *charmPathSuite) TestInvalidRelativePath(c *gc.C) {
 	_, _, err := charmrepo.NewCharmAtPath("./foo", "trusty")
 	c.Assert(err, gc.Equals, os.ErrNotExist)

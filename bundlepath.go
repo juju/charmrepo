@@ -18,15 +18,14 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 		return nil, nil, errgo.New("path to bundle not specified")
 	}
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if isNotExistsError(err) {
 		return nil, nil, os.ErrNotExist
-	}
-	if !isValidCharmOrBundlePath(path) {
+	} else if err == nil && !isValidCharmOrBundlePath(path) {
 		return nil, nil, InvalidPath(path)
 	}
 	b, err := charm.ReadBundle(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExistsError(err) {
 			return nil, nil, BundleNotFound(path)
 		}
 		return nil, nil, err
@@ -50,7 +49,7 @@ func NewBundleAtPath(path string) (charm.Bundle, *charm.URL, error) {
 func ReadBundleFile(path string) (*charm.BundleData, error) {
 	f, err := os.Open(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExistsError(err) {
 			return nil, BundleNotFound(path)
 		}
 		return nil, err
