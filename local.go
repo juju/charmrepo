@@ -156,7 +156,7 @@ func (r *LocalRepository) checkUrlAndPath(curl *charm.URL) error {
 	}
 	info, err := os.Stat(r.Path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExistsError(err) {
 			return repoNotFound(r.Path)
 		}
 		return err

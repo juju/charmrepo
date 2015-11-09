@@ -12,6 +12,19 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 )
 
+func isNotExistsError(err error) bool {
+	if os.IsNotExist(err) {
+		return true
+	}
+	// On Windows, we get a path error due to a GetFileAttributesEx syscall.
+	// To avoid being too proscriptive, we'll simply check for the error
+	// type and not any content.
+	if _, ok := err.(*os.PathError); ok {
+		return true
+	}
+	return false
+}
+
 func isValidCharmOrBundlePath(path string) bool {
 	//Exclude relative paths.
 	return strings.HasPrefix(path, ".") || filepath.IsAbs(path)
@@ -27,15 +40,14 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 		return nil, nil, errgo.New("empty charm path")
 	}
 	_, err := os.Stat(path)
-	if os.IsNotExist(err) {
+	if isNotExistsError(err) {
 		return nil, nil, os.ErrNotExist
-	}
-	if !isValidCharmOrBundlePath(path) {
+	} else if err == nil && !isValidCharmOrBundlePath(path) {
 		return nil, nil, InvalidPath(path)
 	}
 	ch, err := charm.ReadCharm(path)
 	if err != nil {
-		if os.IsNotExist(err) {
+		if isNotExistsError(err) {
 			return nil, nil, CharmNotFound(path)
 		}
 		return nil, nil, err
