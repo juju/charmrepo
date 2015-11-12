@@ -18,7 +18,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
+	"gopkg.in/juju/charmrepo.v2"
 )
 
 var logger = loggo.GetLogger("juju.charm.testing.mockstore")
@@ -100,15 +100,11 @@ func (s *MockStore) serveInfo(w http.ResponseWriter, r *http.Request) {
 		cr := &charmrepo.InfoResponse{}
 		response[url] = cr
 		charmURL, err := charm.ParseURL(url)
-		if err == charm.ErrUnresolvedUrl {
-			ref, err := charm.ParseReference(url)
-			if err != nil {
-				panic(err)
-			}
-			charmURL, err = ref.URL(s.DefaultSeries)
-			if err != nil {
-				panic(err)
-			}
+		if err != nil {
+			panic(err)
+		}
+		if charmURL.Series == "" {
+			charmURL.Series = s.DefaultSeries
 		}
 		switch charmURL.Name {
 		case "borken":

@@ -17,8 +17,8 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1/csclient"
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 )
 
 // CacheDir stores the charm cache directory path.
@@ -112,7 +112,7 @@ func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 	if curl.Series == "bundle" {
 		etype = "bundle"
 	}
-	r, id, expectHash, expectSize, err := s.client.GetArchive(curl.Reference())
+	r, id, expectHash, expectSize, err := s.client.GetArchive(curl)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
@@ -233,7 +233,7 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, error) {
 	var result struct {
 		Id params.IdResponse
 	}
@@ -245,17 +245,13 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 			case "bundle":
 				etype = "bundle"
 			case "":
-				etype = "entity"
+				etype = "charm or bundle"
 			}
 			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
 		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
-	url, err := result.Id.Id.URL("")
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make fully resolved entity URL from %s", url)
-	}
-	return url, nil
+	return result.Id.Id, nil
 }
 
 // URL returns the root endpoint URL of the charm store.
