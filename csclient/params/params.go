@@ -221,6 +221,20 @@ type PermRequest struct {
 	Write []string
 }
 
+// HomePage holds the request/response of an id/meta/home-page PUT or GET request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idmeta
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetahome-page
+type HomePage struct {
+	HomePage string
+}
+
+// BugsURL holds the request/response of an id/meta/bugs-url PUT or GET request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idmeta
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabugs-url
+type BugsURL struct {
+	BugsURL string
+}
+
 // PromulgatedResponse holds the result of an id/meta/promulgated GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetapromulgated
 type PromulgatedResponse struct {
