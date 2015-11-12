@@ -39,18 +39,14 @@ func NewLocalRepository(path string) (Interface, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.URL, error) {
-	if ref.Series == "" {
-		return nil, errgo.Newf("no series specified for %s", ref)
+func (r *LocalRepository) Resolve(u *charm.URL) (*charm.URL, error) {
+	if u.Series == "" {
+		return nil, errgo.Newf("no series specified for %s", u)
 	}
-	u, err := ref.URL("")
-	if err != nil {
-		return nil, err
-	}
-	if ref.Revision != -1 {
+	if u.Revision != -1 {
 		return u, nil
 	}
-	if ref.Series == "bundle" {
+	if u.Series == "bundle" {
 		// Bundles do not have revision files and the revision is not included
 		// in metadata. For this reason, local bundles always have revision 0.
 		return u.WithRevision(0), nil

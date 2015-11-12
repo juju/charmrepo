@@ -24,10 +24,10 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmstore.v5-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
-	"gopkg.in/juju/charmrepo.v1/csclient"
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v1/testing"
+	"gopkg.in/juju/charmrepo.v2"
+	"gopkg.in/juju/charmrepo.v2/csclient"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
 )
 
 type charmStoreSuite struct {
@@ -94,7 +94,7 @@ func (s *charmStoreBaseSuite) startServer(c *gc.C) {
 // addCharm uploads a charm to the testing charm store, and returns the
 // resulting charm and charm URL.
 func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
-	id := charm.MustParseReference(urlStr)
+	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
 		id.User = "who"
@@ -110,16 +110,13 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Return the charm and its URL.
-	url, err := id.URL("")
-	c.Assert(err, gc.IsNil)
-	return ch, url
+	return ch, id
 }
 
 // addBundle uploads a bundle to the testing charm store, and returns the
 // resulting bundle and bundle URL.
 func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bundle, *charm.URL) {
-	id := charm.MustParseReference(urlStr)
+	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
 		id.User = "who"
@@ -136,9 +133,7 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Return the bundle and its URL.
-	url, err := id.URL("")
-	c.Assert(err, gc.IsNil)
-	return b, url
+	return b, id
 }
 
 type charmStoreRepoSuite struct {
@@ -523,6 +518,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	}, {
 		id:  "~who/wordpress-2",
 		url: "cs:~who/precise/wordpress-2",
+		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
 	}, {
 		id:  "~dalek/riak",
 		url: "cs:~dalek/utopic/riak-42",
@@ -543,13 +539,13 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
 	}, {
 		id:  "no-such",
-		err: `cannot resolve URL "cs:no-such": entity not found`,
+		err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
 	}}
 
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		url, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
 			c.Assert(err.Error(), gc.Equals, test.err)
 			c.Assert(url, gc.IsNil)

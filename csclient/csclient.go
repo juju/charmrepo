@@ -21,7 +21,7 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 )
 
 const apiVersion = "v4"
@@ -103,7 +103,7 @@ func (c *Client) SetHTTPHeader(header http.Header) {
 // GetArchive retrieves the archive for the given charm or bundle, returning a
 // reader its data can be read from, the fully qualified id of the
 // corresponding entity, the SHA384 hash of the data and its size.
-func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Reference, hash string, size int64, err error) {
+func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error) {
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
@@ -130,7 +130,7 @@ func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Re
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Newf("no %s header found in response", params.EntityIdHeader)
 	}
-	eid, err = charm.ParseReference(entityId)
+	eid, err = charm.ParseURL(entityId)
 	if err != nil {
 		// The server did not return a valid id.
 		resp.Body.Close()
@@ -168,7 +168,7 @@ func (c *Client) StatsUpdate(req params.StatsUpdateRequest) error {
 //
 // UploadCharm returns the id that the charm has been given in the
 // store - this will be the same as id except the revision.
-func (c *Client) UploadCharm(id *charm.Reference, ch charm.Charm) (*charm.Reference, error) {
+func (c *Client) UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error) {
 	if id.Revision != -1 {
 		return nil, errgo.Newf("revision specified in %q, but should not be specified", id)
 	}
@@ -187,7 +187,7 @@ func (c *Client) UploadCharm(id *charm.Reference, ch charm.Charm) (*charm.Refere
 //
 // This method is provided only for testing and should not
 // generally be used otherwise.
-func (c *Client) UploadCharmWithRevision(id *charm.Reference, ch charm.Charm, promulgatedRevision int) error {
+func (c *Client) UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulgatedRevision int) error {
 	if id.Revision == -1 {
 		return errgo.Newf("revision not specified in %q", id)
 	}
@@ -207,7 +207,7 @@ func (c *Client) UploadCharmWithRevision(id *charm.Reference, ch charm.Charm, pr
 //
 // UploadBundle returns the id that the bundle has been given in the
 // store - this will be the same as id except the revision.
-func (c *Client) UploadBundle(id *charm.Reference, b charm.Bundle) (*charm.Reference, error) {
+func (c *Client) UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error) {
 	if id.Revision != -1 {
 		return nil, errgo.Newf("revision specified in %q, but should not be specified", id)
 	}
@@ -226,7 +226,7 @@ func (c *Client) UploadBundle(id *charm.Reference, b charm.Bundle) (*charm.Refer
 //
 // This method is provided only for testing and should not
 // generally be used otherwise.
-func (c *Client) UploadBundleWithRevision(id *charm.Reference, b charm.Bundle, promulgatedRevision int) error {
+func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulgatedRevision int) error {
 	if id.Revision == -1 {
 		return errgo.Newf("revision not specified in %q", id)
 	}
@@ -243,7 +243,7 @@ func (c *Client) UploadBundleWithRevision(id *charm.Reference, b charm.Bundle, p
 // the given body, its SHA384 hash and its size. It returns the resulting
 // entity reference. The given id should include the series and should not
 // include the revision.
-func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.Reference, error) {
+func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
 	// When uploading archives, it can be a problem that the
 	// an error response is returned while we are still writing
 	// the body data.
@@ -307,7 +307,7 @@ func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash str
 // Each entry in the info map causes a value in extra-info with
 // that key to be set to the associated value.
 // Entries not set in the map will be unchanged.
-func (c *Client) PutExtraInfo(id *charm.Reference, info map[string]interface{}) error {
+func (c *Client) PutExtraInfo(id *charm.URL, info map[string]interface{}) error {
 	return c.Put("/"+id.Path()+"/meta/extra-info", info)
 }
 
@@ -337,7 +337,7 @@ func (c *Client) PutExtraInfo(id *charm.Reference, info map[string]interface{}) 
 //		Digest string `csclient:"extra-info/digest"`
 //	}
 //	id, err := client.Meta(id, &result)
-func (c *Client) Meta(id *charm.Reference, result interface{}) (*charm.Reference, error) {
+func (c *Client) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
 	if result == nil {
 		return nil, fmt.Errorf("expected valid result pointer, not nil")
 	}
@@ -387,7 +387,7 @@ func (c *Client) Meta(id *charm.Reference, result interface{}) (*charm.Reference
 	// but we want to keep them raw so that we can unmarshal
 	// them ourselves.
 	var rawResult struct {
-		Id   *charm.Reference
+		Id   *charm.URL
 		Meta map[string]json.RawMessage
 	}
 	path := "/" + id.Path() + "/meta/any"
@@ -574,7 +574,7 @@ func sizeLimit(data []byte) []byte {
 }
 
 // Log sends a log message to the charmstore's log database.
-func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.Reference) error {
+func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.URL) error {
 	b, err := json.Marshal(message)
 	if err != nil {
 		return errgo.Notef(err, "cannot marshal log message")

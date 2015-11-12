@@ -13,7 +13,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
+	"gopkg.in/juju/charmrepo.v2"
 )
 
 type LocalRepoSuite struct {
@@ -192,55 +192,55 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 
 	// Define the tests to be run.
 	tests := []struct {
-		id  string
-		url string
-		err string
+		id        string
+		expectId  string
+		expectErr string
 	}{{
-		id:  "local:quantal/upgrade",
-		url: "local:quantal/upgrade-2",
+		id:       "local:quantal/upgrade",
+		expectId: "local:quantal/upgrade-2",
 	}, {
-		id:  "local:quantal/upgrade-1",
-		url: "local:quantal/upgrade-1",
+		id:       "local:quantal/upgrade-1",
+		expectId: "local:quantal/upgrade-1",
 	}, {
-		id:  "local:quantal/wordpress",
-		url: "local:quantal/wordpress-3",
+		id:       "local:quantal/wordpress",
+		expectId: "local:quantal/wordpress-3",
 	}, {
-		id:  "local:quantal/riak",
-		url: "local:quantal/riak-7",
+		id:       "local:quantal/riak",
+		expectId: "local:quantal/riak-7",
 	}, {
-		id:  "local:quantal/wordpress-3",
-		url: "local:quantal/wordpress-3",
+		id:       "local:quantal/wordpress-3",
+		expectId: "local:quantal/wordpress-3",
 	}, {
-		id:  "local:quantal/wordpress-2",
-		url: "local:quantal/wordpress-2",
+		id:       "local:quantal/wordpress-2",
+		expectId: "local:quantal/wordpress-2",
 	}, {
-		id:  "local:bundle/openstack",
-		url: "local:bundle/openstack-0",
+		id:       "local:bundle/openstack",
+		expectId: "local:bundle/openstack-0",
 	}, {
-		id:  "local:bundle/openstack-42",
-		url: "local:bundle/openstack-42",
+		id:       "local:bundle/openstack-42",
+		expectId: "local:bundle/openstack-42",
 	}, {
-		id:  "local:trusty/riak",
-		err: "entity not found .*: local:trusty/riak",
+		id:        "local:trusty/riak",
+		expectErr: "entity not found .*: local:trusty/riak",
 	}, {
-		id:  "local:quantal/no-such",
-		err: "entity not found .*: local:quantal/no-such",
+		id:        "local:quantal/no-such",
+		expectErr: "entity not found .*: local:quantal/no-such",
 	}, {
-		id:  "local:upgrade",
-		err: "no series specified for local:upgrade",
+		id:        "local:upgrade",
+		expectErr: "no series specified for local:upgrade",
 	}}
 
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
-		if test.err != "" {
-			c.Assert(err, gc.ErrorMatches, test.err)
-			c.Assert(url, gc.IsNil)
+		id, err := s.repo.Resolve(charm.MustParseURL(test.id))
+		if test.expectErr != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectErr)
+			c.Assert(id, gc.IsNil)
 			continue
 		}
 		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Assert(id, jc.DeepEquals, charm.MustParseURL(test.expectId))
 	}
 }
 

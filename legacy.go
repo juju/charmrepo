@@ -77,7 +77,7 @@ func (s *LegacyCharmStore) get(url string) (resp *http.Response, err error) {
 }
 
 // Resolve canonicalizes charm URLs any implied series in the reference.
-func (s *LegacyCharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *LegacyCharmStore) Resolve(ref *charm.URL) (*charm.URL, error) {
 	infos, err := s.Info(ref)
 	if err != nil {
 		return nil, err
@@ -356,7 +356,7 @@ func (s *LegacyCharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 
 // LegacyInferRepository returns a charm repository inferred from the provided
 // charm or bundle reference. Local references will use the provided path.
-func LegacyInferRepository(ref *charm.Reference, localRepoPath string) (repo Interface, err error) {
+func LegacyInferRepository(ref *charm.URL, localRepoPath string) (repo Interface, err error) {
 	switch ref.Schema {
 	case "cs":
 		repo = LegacyStore
