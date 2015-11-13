@@ -34,15 +34,15 @@ const (
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
 type MetaAnyResponse struct {
-	Id   *charm.Reference
+	Id   *charm.URL
 	Meta map[string]interface{} `json:",omitempty"`
 }
 
 // ArchiveUploadResponse holds the result of a post or a put to /id/archive.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#post-idarchive
 type ArchiveUploadResponse struct {
-	Id            *charm.Reference
-	PromulgatedId *charm.Reference `json:",omitempty"`
+	Id            *charm.URL
+	PromulgatedId *charm.URL `json:",omitempty"`
 }
 
 // Constants for the StatsUpdateRequest
@@ -63,9 +63,9 @@ type StatsUpdateRequest struct {
 // StatsUpdateEntry holds an entry of the StatsUpdateRequest for a put to /stats/update.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
 type StatsUpdateEntry struct {
-	Timestamp      time.Time        // Time when the update did happen.
-	Type           StatsUpdateType  // One of the constant Download, Traffic or Deploy.
-	CharmReference *charm.Reference // The charm to be updated.
+	Timestamp      time.Time       // Time when the update did happen.
+	Type           StatsUpdateType // One of the constant Download, Traffic or Deploy.
+	CharmReference *charm.URL      // The charm to be updated.
 }
 
 // ExpandedId holds a charm or bundle fully qualified id.
@@ -120,7 +120,13 @@ type RelatedResponse struct {
 // RevisionInfoResponse holds the result of an id/meta/revision-info GET
 // request. See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetarevision-info
 type RevisionInfoResponse struct {
-	Revisions []*charm.Reference
+	Revisions []*charm.URL
+}
+
+// SupportedSeries holds the result of an id/meta/supported-series GET
+// request. See See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetasupported-series
+type SupportedSeriesResponse struct {
+	SupportedSeries []string
 }
 
 // BundleCount holds the result of an id/meta/bundle-unit-count
@@ -140,7 +146,7 @@ type TagsResponse struct {
 // Published holds the result of a changes/published GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-changespublished
 type Published struct {
-	Id          *charm.Reference
+	Id          *charm.URL
 	PublishTime time.Time
 }
 
@@ -151,7 +157,7 @@ type DebugStatus debugstatus.CheckResult
 
 // SearchResult holds a single result from a search operation.
 type SearchResult struct {
-	Id *charm.Reference
+	Id *charm.URL
 	// Meta holds at most one entry for each meta value
 	// specified in the include flags, holding the
 	// data that would be returned by reading /meta/meta?id=id.
@@ -194,7 +200,7 @@ type IdRevisionResponse struct {
 // IdResponse holds the result of an id/meta/id GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid
 type IdResponse struct {
-	Id       *charm.Reference
+	Id       *charm.URL
 	User     string `json:",omitempty"`
 	Series   string `json:",omitempty"`
 	Name     string
@@ -259,7 +265,7 @@ type Log struct {
 	Type LogType
 
 	// URLs holds a slice of entity URLs associated with the log message.
-	URLs []*charm.Reference `json:",omitempty"`
+	URLs []*charm.URL `json:",omitempty"`
 }
 
 // LogResponse represents a single log message and is used in the responses
@@ -276,7 +282,7 @@ type LogResponse struct {
 	Type LogType
 
 	// URLs holds a slice of entity URLs associated with the log message.
-	URLs []*charm.Reference `json:",omitempty"`
+	URLs []*charm.URL `json:",omitempty"`
 
 	// Time holds the time of the log.
 	Time time.Time

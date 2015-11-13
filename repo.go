@@ -29,14 +29,14 @@ type Interface interface {
 	// the charm with the preferred series first.
 	// If ref holds a series, then Resolve will always ensure that the returned
 	// entity supports that series.
-	Resolve(ref *charm.Reference) (canonRef *charm.Reference, supportedSeries []string, err error)
+	Resolve(ref *charm.URL) (canonRef *charm.URL, supportedSeries []string, err error)
 }
 
 // InferRepository returns a charm repository inferred from the provided charm
 // or bundle reference.
 // Charm store references will use the provided parameters.
 // Local references will use the provided path.
-func InferRepository(ref *charm.Reference, charmStoreParams NewCharmStoreParams, localRepoPath string) (Interface, error) {
+func InferRepository(ref *charm.URL, charmStoreParams NewCharmStoreParams, localRepoPath string) (Interface, error) {
 	switch ref.Schema {
 	case "cs":
 		return NewCharmStore(charmStoreParams), nil

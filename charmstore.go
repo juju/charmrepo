@@ -112,7 +112,7 @@ func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 	if curl.Series == "bundle" {
 		etype = "bundle"
 	}
-	r, id, expectHash, expectSize, err := s.client.GetArchive(curl.Reference())
+	r, id, expectHash, expectSize, err := s.client.GetArchive(curl)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
@@ -233,7 +233,7 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.Reference, []string, error) {
+func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	var result struct {
 		Id params.IdResponse
 	}

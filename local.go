@@ -39,23 +39,19 @@ func NewLocalRepository(path string) (Interface, error) {
 }
 
 // Resolve implements Interface.Resolve.
-func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.Reference, []string, error) {
+func (r *LocalRepository) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	if ref.Series == "" {
 		return nil, nil, errgo.Newf("no series specified for %s", ref)
 	}
-	u, err := ref.URL("")
-	if err != nil {
-		return nil, nil, err
-	}
 	if ref.Revision != -1 {
-		return u.Reference(), nil, nil
+		return ref, nil, nil
 	}
 	if ref.Series == "bundle" {
 		// Bundles do not have revision files and the revision is not included
 		// in metadata. For this reason, local bundles always have revision 0.
-		return u.WithRevision(0).Reference(), nil, nil
+		return ref.WithRevision(0), nil, nil
 	}
-	ch, err := r.Get(u)
+	ch, err := r.Get(ref)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -69,7 +65,7 @@ func (r *LocalRepository) Resolve(ref *charm.Reference) (*charm.Reference, []str
 	// repository may declare series, it doesn't make sense because charms are
 	// expected to be for a single series only in the repository. The local
 	// repository concept is deprecated for multi series charms.
-	return u.WithRevision(ch.Revision()).Reference(), nil, nil
+	return ref.WithRevision(ch.Revision()), nil, nil
 }
 
 func mightBeCharm(info os.FileInfo) bool {
