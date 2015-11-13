@@ -61,7 +61,7 @@ type legacyService struct {
 // into multiple relation clauses.
 //
 // The isSubordinate argument is used to find out whether a charm is a subordinate.
-func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.Reference) (bool, error)) (map[string]*charm.BundleData, error) {
+func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.URL) (bool, error)) (map[string]*charm.BundleData, error) {
 	var bundles map[string]*legacyBundle
 	if err := yaml.Unmarshal(bundlesYAML, &bundles); err != nil {
 		return nil, errgo.Notef(err, "cannot parse legacy bundle")
@@ -82,7 +82,7 @@ func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.Reference) (bool, 
 	return newBundles, nil
 }
 
-func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, error)) (*charm.BundleData, error) {
+func migrate(b *legacyBundle, isSubordinate func(id *charm.URL) (bool, error)) (*charm.BundleData, error) {
 	data := &charm.BundleData{
 		Services: make(map[string]*charm.ServiceSpec),
 		Series:   b.Series,
@@ -101,7 +101,7 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.Reference) (bool, err
 		if svc.NumUnits != nil {
 			numUnits = *svc.NumUnits
 		} else {
-			id, err := charm.ParseReference(charmId)
+			id, err := charm.ParseURL(charmId)
 			if err != nil {
 				return nil, errgo.Mask(err)
 			}

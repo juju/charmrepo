@@ -198,16 +198,14 @@ func (s *LocalRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		ref, series, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		ref, series, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
 			c.Assert(err, gc.ErrorMatches, test.err)
 			c.Assert(ref, gc.IsNil)
 			continue
 		}
 		c.Assert(err, jc.ErrorIsNil)
-		url, err := ref.URL("")
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Assert(ref, jc.DeepEquals, charm.MustParseURL(test.url))
 		c.Assert(series, jc.DeepEquals, test.series)
 	}
 }

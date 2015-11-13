@@ -388,7 +388,7 @@ var legacyInferRepositoryTests = []struct {
 func (s *legacyCharmStoreSuite) TestInferRepository(c *gc.C) {
 	for i, t := range legacyInferRepositoryTests {
 		c.Logf("test %d", i)
-		ref, err := charm.ParseReference(t.url)
+		ref, err := charm.ParseURL(t.url)
 		c.Assert(err, gc.IsNil)
 		repo, err := charmrepo.LegacyInferRepository(ref, "/some/path")
 		c.Assert(err, gc.IsNil)
@@ -399,7 +399,7 @@ func (s *legacyCharmStoreSuite) TestInferRepository(c *gc.C) {
 			c.Assert(repo, gc.Equals, charmrepo.LegacyStore)
 		}
 	}
-	ref, err := charm.ParseReference("local:whatever")
+	ref, err := charm.ParseURL("local:whatever")
 	c.Assert(err, gc.IsNil)
 	_, err = charmrepo.LegacyInferRepository(ref, "")
 	c.Assert(err, gc.ErrorMatches, "path to local repository not specified")

@@ -36,7 +36,7 @@ var inferRepositoryTests = []struct {
 func (s *inferRepoSuite) TestInferRepository(c *gc.C) {
 	for i, test := range inferRepositoryTests {
 		c.Logf("test %d: %s", i, test.url)
-		ref := charm.MustParseReference(test.url)
+		ref := charm.MustParseURL(test.url)
 		repo, err := charmrepo.InferRepository(
 			ref, charmrepo.NewCharmStoreParams{}, test.localRepoPath)
 		if test.err != "" {
