@@ -30,6 +30,7 @@ const (
 	ErrUnauthorized       ErrorCode = "unauthorized"
 	ErrMethodNotAllowed   ErrorCode = "method not allowed"
 	ErrServiceUnavailable ErrorCode = "service unavailable"
+	ErrEntityIdNotAllowed ErrorCode = "charm or bundle id not allowed"
 
 	// Note that these error codes sit in the same name space
 	// as the bakery error codes defined in gopkg.in/macaroon-bakery.v0/httpbakery .
