@@ -445,12 +445,12 @@ var getArchiveWithBadResponseTests = []struct {
 		ProtoMinor: 0,
 		Header: http.Header{
 			params.ContentHashHeader: {fakeHash},
-			params.EntityIdHeader:    {"django-42"},
+			params.EntityIdHeader:    {"django"},
 		},
 		Body:          ioutil.NopCloser(strings.NewReader("")),
 		ContentLength: fakeSize,
 	},
-	expectError: `archive get returned not fully qualified entity id "cs:django-42"`,
+	expectError: `archive get returned not fully qualified entity id "cs:django"`,
 }, {
 	about: "no hash header",
 	response: &http.Response{
@@ -566,13 +566,9 @@ func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
 	}
 }
 
-func (s *suite) TestUploadArchiveWithNoSeries(c *gc.C) {
-	id, err := csclient.UploadArchive(
-		s.client,
-		charm.MustParseURL("wordpress"),
-		fakeReader, fakeHash, fakeSize, -1)
-	c.Assert(id, gc.IsNil)
-	c.Assert(err, gc.ErrorMatches, `no series specified in "cs:wordpress"`)
+func (s *suite) TestUploadMultiSeriesArchive(c *gc.C) {
+	path := charmRepo.CharmArchivePath(c.MkDir(), "multi-series")
+	s.checkUploadArchive(c, path, "~charmers/wordpress", "cs:~charmers/wordpress-0")
 }
 
 func (s *suite) TestUploadArchiveWithServerError(c *gc.C) {
@@ -753,7 +749,7 @@ func (s *suite) TestUploadBundleErrorUploading(c *gc.C) {
 		charm.MustParseURL("~charmers/wordpress-simple"),
 		charmRepo.BundleDir("wordpress-simple"),
 	)
-	c.Assert(err, gc.ErrorMatches, `no series specified in "cs:~charmers/wordpress-simple"`)
+	c.Assert(err, gc.ErrorMatches, `cannot post archive: cannot read charm archive: archive file "metadata.yaml" not found`)
 	c.Assert(id, gc.IsNil)
 }
 
