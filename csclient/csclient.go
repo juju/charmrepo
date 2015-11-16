@@ -136,7 +136,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Notef(err, "invalid entity id found in response")
 	}
-	if eid.Series == "" || eid.Revision == -1 {
+	if eid.Revision == -1 {
 		// The server did not return a fully qualified entity id.
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Newf("archive get returned not fully qualified entity id %q", eid)
@@ -259,10 +259,6 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 		if err := c.Login(); err != nil {
 			return nil, errgo.Notef(err, "cannot log in")
 		}
-	}
-	// Validate the entity id.
-	if id.Series == "" {
-		return nil, errgo.Newf("no series specified in %q", id)
 	}
 	method := "POST"
 	promulgatedArg := ""
