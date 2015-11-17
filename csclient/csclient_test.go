@@ -1178,7 +1178,7 @@ func (s *suite) TestPutExtraInfoWithError(c *gc.C) {
 }
 
 func (s *suite) TestPutCommonInfoWithError(c *gc.C) {
-	err := s.client.PutCommonInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"attr": "val"})
+	err := s.client.PutCommonInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"homepage": "val"})
 	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:wordpress"`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
