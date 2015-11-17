@@ -233,6 +233,19 @@ type PromulgateRequest struct {
 	Promulgated bool
 }
 
+// PublishRequest holds the request of an id/publish PUT request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+type PublishRequest struct {
+	Published bool
+}
+
+// PublishResponse holds the result of an id/publish PUT request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+type PublishResponse struct {
+	Id            *charm.URL
+	PromulgatedId *charm.URL `json:",omitempty"`
+}
+
 // WhoAmIResponse holds the result of a whoami GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#whoami
 type WhoAmIResponse struct {
