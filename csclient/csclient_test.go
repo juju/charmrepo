@@ -1103,6 +1103,14 @@ func (s *suite) TestMeta(c *gc.C) {
 }
 
 func (s *suite) TestPutExtraInfo(c *gc.C) {
+	s.checkPutInfo(c, false)
+}
+
+func (s *suite) TestPutCommonInfo(c *gc.C) {
+	s.checkPutInfo(c, true)
+}
+
+func (s *suite) checkPutInfo(c *gc.C, common bool) {
 	ch := charmRepo.CharmDir("wordpress")
 	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
 	err := s.client.UploadCharmWithRevision(url, ch, 42)
@@ -1113,32 +1121,64 @@ func (s *suite) TestPutExtraInfo(c *gc.C) {
 		"attr1": "value1",
 		"attr2": []interface{}{"one", "two"},
 	}
-	err = s.client.PutExtraInfo(url, info)
-	c.Assert(err, gc.IsNil)
+	if common {
+		err = s.client.PutCommonInfo(url, info)
+		c.Assert(err, gc.IsNil)
+	} else {
+		err = s.client.PutExtraInfo(url, info)
+		c.Assert(err, gc.IsNil)
+	}
 
 	// Verify that we get it back OK.
-	var val struct {
+	var valExtraInfo struct {
 		ExtraInfo map[string]interface{}
 	}
-	_, err = s.client.Meta(url, &val)
-	c.Assert(err, gc.IsNil)
-	c.Assert(val.ExtraInfo, jc.DeepEquals, info)
+	var valCommonInfo struct {
+		CommonInfo map[string]interface{}
+	}
+	if common {
+		_, err = s.client.Meta(url, &valCommonInfo)
+		c.Assert(err, gc.IsNil)
+		c.Assert(valCommonInfo.CommonInfo, jc.DeepEquals, info)
+	} else {
+		_, err = s.client.Meta(url, &valExtraInfo)
+		c.Assert(err, gc.IsNil)
+		c.Assert(valExtraInfo.ExtraInfo, jc.DeepEquals, info)
+	}
 
 	// Put some more in.
-	err = s.client.PutExtraInfo(url, map[string]interface{}{
-		"attr3": "three",
-	})
-	c.Assert(err, gc.IsNil)
-
+	if common {
+		err = s.client.PutCommonInfo(url, map[string]interface{}{
+			"attr3": "three",
+		})
+		c.Assert(err, gc.IsNil)
+	} else {
+		err = s.client.PutExtraInfo(url, map[string]interface{}{
+			"attr3": "three",
+		})
+		c.Assert(err, gc.IsNil)
+	}
 	// Verify that we get all the previous results and the new value.
 	info["attr3"] = "three"
-	_, err = s.client.Meta(url, &val)
-	c.Assert(err, gc.IsNil)
-	c.Assert(val.ExtraInfo, jc.DeepEquals, info)
+	if common {
+		_, err = s.client.Meta(url, &valCommonInfo)
+		c.Assert(err, gc.IsNil)
+		c.Assert(valCommonInfo.CommonInfo, jc.DeepEquals, info)
+	} else {
+		_, err = s.client.Meta(url, &valExtraInfo)
+		c.Assert(err, gc.IsNil)
+		c.Assert(valExtraInfo.ExtraInfo, jc.DeepEquals, info)
+	}
 }
 
 func (s *suite) TestPutExtraInfoWithError(c *gc.C) {
 	err := s.client.PutExtraInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"attr": "val"})
+	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:wordpress"`)
+	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
+}
+
+func (s *suite) TestPutCommonInfoWithError(c *gc.C) {
+	err := s.client.PutCommonInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"attr": "val"})
 	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:wordpress"`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
