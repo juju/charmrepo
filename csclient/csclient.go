@@ -307,6 +307,14 @@ func (c *Client) PutExtraInfo(id *charm.URL, info map[string]interface{}) error 
 	return c.Put("/"+id.Path()+"/meta/extra-info", info)
 }
 
+// PutCommonInfo puts common-info data for the given id.
+// Each entry in the info map causes a value in common-info with
+// that key to be set to the associated value.
+// Entries not set in the map will be unchanged.
+func (c *Client) PutCommonInfo(id *charm.URL, info map[string]interface{}) error {
+	return c.Put("/"+id.Path()+"/meta/common-info", info)
+}
+
 // Meta fetches metadata on the charm or bundle with the
 // given id. The result value provides a value
 // to be filled in with the result, which must be
