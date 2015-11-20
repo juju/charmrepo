@@ -514,7 +514,7 @@ func checkBundleData(c *gc.C, bd *charm.BundleData) bool {
 		charms[svc.Charm] = ch
 	}
 	if ok {
-		if err := bd.VerifyWithCharms(nil, charms); err != nil {
+		if err := bd.VerifyWithCharms(nil, nil, charms); err != nil {
 			for _, err := range err.(*charm.VerificationError).Errors {
 				c.Logf("verification error: %v", err)
 			}

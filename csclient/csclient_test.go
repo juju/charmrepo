@@ -260,16 +260,24 @@ func (s *suite) TestPutError(c *gc.C) {
 		42)
 	c.Assert(err, gc.IsNil)
 
+	checkErr := func(err error, expectError string, expectErrorCode params.ErrorCode) {
+		c.Assert(err, gc.ErrorMatches, expectError)
+		cause := errgo.Cause(err)
+		if code, ok := cause.(params.ErrorCode); ok {
+			c.Assert(code, gc.Equals, expectErrorCode)
+		} else {
+			c.Assert(expectErrorCode, gc.Equals, params.ErrorCode(""))
+		}
+	}
+	var result string
+
 	for i, test := range putErrorTests {
 		c.Logf("test %d: %s", i, test.about)
 		err := s.client.Put(test.path, test.val)
-		c.Assert(err, gc.ErrorMatches, test.expectError)
-		cause := errgo.Cause(err)
-		if code, ok := cause.(params.ErrorCode); ok {
-			c.Assert(code, gc.Equals, test.expectErrorCode)
-		} else {
-			c.Assert(test.expectErrorCode, gc.Equals, params.ErrorCode(""))
-		}
+		checkErr(err, test.expectError, test.expectErrorCode)
+		err = s.client.PutWithResponse(test.path, test.val, &result)
+		checkErr(err, test.expectError, test.expectErrorCode)
+		c.Assert(result, gc.Equals, "")
 	}
 }
 
@@ -287,6 +295,26 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 	err = s.client.Get("/~charmers/utopic/wordpress-42/meta/perm/read", &got)
 	c.Assert(err, gc.IsNil)
 	c.Assert(got, jc.DeepEquals, perms)
+}
+
+func (s *suite) TestPutWithResponseSuccess(c *gc.C) {
+	err := s.client.UploadCharmWithRevision(
+		charm.MustParseURL("~charmers/development/wily/wordpress-42"),
+		charmRepo.CharmDir("wordpress"),
+		42)
+	c.Assert(err, gc.IsNil)
+
+	publish := &params.PublishRequest{
+		Published: true,
+	}
+	var result params.PublishResponse
+	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, &result)
+	c.Assert(err, gc.IsNil)
+	c.Assert(result.Id, jc.DeepEquals, charm.MustParseURL("~charmers/wily/wordpress-42"))
+
+	// Check that the method accepts a nil result.
+	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, nil)
+	c.Assert(err, gc.IsNil)
 }
 
 func (s *suite) TestGetArchive(c *gc.C) {

@@ -464,10 +464,20 @@ func (c *Client) Get(path string, result interface{}) error {
 	return nil
 }
 
-// Put makes a PUT request to the given path in the charm store (not
-// including the host name or version prefix, but including a leading
-// /), marshaling the given value as JSON to use as the request body.
+// Put makes a PUT request to the given path in the charm store
+// (not including the host name or version prefix, but including a leading /),
+// marshaling the given value as JSON to use as the request body.
 func (c *Client) Put(path string, val interface{}) error {
+	return c.PutWithResponse(path, val, nil)
+}
+
+// PutWithResponse makes a PUT request to the given path in the charm store
+// (not including the host name or version prefix, but including a leading /),
+// marshaling the given value as JSON to use as the request body. Additionally,
+// this method parses the result as JSON into the given result value, which
+// should be a pointer to the expected data, but may be nil if no result is
+// desired.
+func (c *Client) PutWithResponse(path string, val, result interface{}) error {
 	req, _ := http.NewRequest("PUT", "", nil)
 	req.Header.Set("Content-Type", "application/json")
 	data, err := json.Marshal(val)
@@ -479,7 +489,11 @@ func (c *Client) Put(path string, val interface{}) error {
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	// Parse the response.
+	if err := parseResponseBody(resp.Body, result); err != nil {
+		return errgo.Mask(err)
+	}
 	return nil
 }
 
