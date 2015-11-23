@@ -80,6 +80,13 @@ func (s *charmPathSuite) TestNoSeriesSpecified(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, "series not specified and charm does not define any")
 }
 
+func (s *charmPathSuite) TestNoSeriesSpecifiedForceStillFails(c *gc.C) {
+	charmDir := filepath.Join(s.repoPath, "mysql")
+	s.cloneCharmDir(s.repoPath, "mysql")
+	_, _, err := charmrepo.NewCharmAtPathForceSeries(charmDir, "", true)
+	c.Assert(err, gc.ErrorMatches, "series not specified and charm does not define any")
+}
+
 func (s *charmPathSuite) TestMuliSeriesDefault(c *gc.C) {
 	charmDir := filepath.Join(s.repoPath, "multi-series")
 	s.cloneCharmDir(s.repoPath, "multi-series")
@@ -105,6 +112,23 @@ func (s *charmPathSuite) TestUnsupportedSeries(c *gc.C) {
 	s.cloneCharmDir(s.repoPath, "multi-series")
 	_, _, err := charmrepo.NewCharmAtPath(charmDir, "wily")
 	c.Assert(err, gc.ErrorMatches, `series "wily" not supported by charm, supported series are.*`)
+}
+
+func (s *charmPathSuite) TestUnsupportedSeriesNoForce(c *gc.C) {
+	charmDir := filepath.Join(s.repoPath, "multi-series")
+	s.cloneCharmDir(s.repoPath, "multi-series")
+	_, _, err := charmrepo.NewCharmAtPathForceSeries(charmDir, "wily", false)
+	c.Assert(err, gc.ErrorMatches, `series "wily" not supported by charm, supported series are.*`)
+}
+
+func (s *charmPathSuite) TestUnsupportedSeriesForce(c *gc.C) {
+	charmDir := filepath.Join(s.repoPath, "multi-series")
+	s.cloneCharmDir(s.repoPath, "multi-series")
+	ch, url, err := charmrepo.NewCharmAtPathForceSeries(charmDir, "wily", true)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(ch.Meta().Name, gc.Equals, "new-charm-with-multi-series")
+	c.Assert(ch.Revision(), gc.Equals, 7)
+	c.Assert(url, gc.DeepEquals, charm.MustParseURL("local:wily/multi-series-7"))
 }
 
 func (s *charmPathSuite) TestFindsSymlinks(c *gc.C) {
