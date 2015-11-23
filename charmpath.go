@@ -36,6 +36,19 @@ func isValidCharmOrBundlePath(path string) bool {
 // Otherwise, the series is validated against those the
 // charm declares it supports.
 func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
+	return NewCharmAtPathForceSeries(path, series, false)
+}
+
+// NewCharmAtPathForSeries returns the charm represented by this path,
+// and a URL that describes it. If the series is empty,
+// the charm's default series is used, if any.
+// Otherwise, the series is validated against those the
+// charm declares it supports. If force is true, then any
+// series validation errors are ignored and the requested
+// series is used regardless. Note though that is it still
+// an error if the series is not specified and the charm does not
+// define any.
+func NewCharmAtPathForceSeries(path, series string, force bool) (charm.Charm, *charm.URL, error) {
 	if path == "" {
 		return nil, nil, errgo.New("empty charm path")
 	}
@@ -58,9 +71,12 @@ func NewCharmAtPath(path, series string) (charm.Charm, *charm.URL, error) {
 	}
 	_, name := filepath.Split(absPath)
 	meta := ch.Meta()
-	seriesToUse, err := charm.SeriesForCharm(series, meta.Series)
-	if err != nil {
-		return nil, nil, err
+	seriesToUse := series
+	if !force || series == "" {
+		seriesToUse, err = charm.SeriesForCharm(series, meta.Series)
+		if err != nil {
+			return nil, nil, err
+		}
 	}
 	url := &charm.URL{
 		Schema:   "local",
