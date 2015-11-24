@@ -506,33 +506,41 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 
 	// Define the tests to be run.
 	tests := []struct {
-		id  string
-		url string
-		err string
+		id              string
+		url             string
+		supportedSeries []string
+		err             string
 	}{{
-		id:  "~who/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/trusty/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/trusty/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/wordpress",
-		url: "cs:~who/precise/wordpress-2",
+		id:              "~who/wordpress",
+		url:             "cs:~who/precise/wordpress-2",
+		supportedSeries: []string{"precise"},
 	}, {
 		id:  "~who/wordpress-2",
 		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
 	}, {
-		id:  "~dalek/riak",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/riak",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "~dalek/utopic/riak-42",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/utopic/riak-42",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql-47",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql-47",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
 	}, {
 		id:  "~dalek/utopic/riak-100",
 		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
@@ -547,7 +555,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		ref, _, err := s.repo.Resolve(charm.MustParseURL(test.id))
+		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
 			c.Assert(err.Error(), gc.Equals, test.err)
 			c.Assert(ref, gc.IsNil)
@@ -555,6 +563,7 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		}
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Assert(supportedSeries, jc.DeepEquals, test.supportedSeries)
 	}
 }
 
