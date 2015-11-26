@@ -155,8 +155,8 @@ type Published struct {
 // debugstatus.CheckResult directly.
 type DebugStatus debugstatus.CheckResult
 
-// SearchResult holds a single result from a search operation.
-type SearchResult struct {
+// EntityResult holds a the resolved entity ID along with any requested metadata.
+type EntityResult struct {
 	Id *charm.URL
 	// Meta holds at most one entry for each meta value
 	// specified in the include flags, holding the
@@ -170,7 +170,12 @@ type SearchResult struct {
 type SearchResponse struct {
 	SearchTime time.Duration
 	Total      int
-	Results    []SearchResult
+	Results    []EntityResult
+}
+
+// ListResponse holds the response from a list operation.
+type ListResponse struct {
+	Results []EntityResult
 }
 
 // IdUserResponse holds the result of an id/meta/id-user GET request.
