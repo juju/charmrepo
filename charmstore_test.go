@@ -91,8 +91,8 @@ func (s *charmStoreBaseSuite) startServer(c *gc.C) {
 	})
 }
 
-// addCharm uploads a charm to the testing charm store, and returns the
-// resulting charm and charm URL.
+// addCharm uploads a charm a promulgated revision to the testing charm store,
+// and returns the resulting charm and charm URL.
 func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
 	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
@@ -111,6 +111,26 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	c.Assert(err, jc.ErrorIsNil)
 
 	return ch, id
+}
+
+// addCharmNoRevision uploads a charm to the testing charm store, and returns the
+// resulting charm and charm URL.
+func (s *charmStoreBaseSuite) addCharmNoRevision(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
+	id := charm.MustParseURL(urlStr)
+	if id.User == "" {
+		id.User = "who"
+	}
+	ch := TestCharms.CharmArchive(c.MkDir(), name)
+
+	// Upload the charm.
+	url, err := s.client.UploadCharm(id, ch)
+	c.Assert(err, gc.IsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.Put("/"+url.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
+
+	return ch, url
 }
 
 // addBundle uploads a bundle to the testing charm store, and returns the
@@ -502,37 +522,50 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
 	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
+	s.addCharmNoRevision(c, "multi-series", "multi-series")
 	s.addCharm(c, "utopic/mysql-47", "mysql")
 
 	// Define the tests to be run.
 	tests := []struct {
-		id  string
-		url string
-		err string
+		id              string
+		url             string
+		supportedSeries []string
+		err             string
 	}{{
-		id:  "~who/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/trusty/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/trusty/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/wordpress",
-		url: "cs:~who/precise/wordpress-2",
+		id:              "~who/wordpress",
+		url:             "cs:~who/precise/wordpress-2",
+		supportedSeries: []string{"precise"},
 	}, {
 		id:  "~who/wordpress-2",
 		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
 	}, {
-		id:  "~dalek/riak",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/riak",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "~dalek/utopic/riak-42",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/utopic/riak-42",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql-47",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql-47",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
+	}, {
+		id:              "~who/multi-series",
+		url:             "cs:~who/multi-series-0",
+		supportedSeries: []string{"trusty", "precise", "quantal"},
 	}, {
 		id:  "~dalek/utopic/riak-100",
 		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
@@ -547,14 +580,15 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		ref, _, err := s.repo.Resolve(charm.MustParseURL(test.id))
+		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
-			c.Assert(err.Error(), gc.Equals, test.err)
-			c.Assert(ref, gc.IsNil)
+			c.Check(err.Error(), gc.Equals, test.err)
+			c.Check(ref, gc.IsNil)
 			continue
 		}
 		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
 	}
 }
 
