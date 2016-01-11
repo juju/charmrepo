@@ -24,7 +24,7 @@ import (
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 )
 
-const apiVersion = "v4"
+const apiVersion = "v5"
 
 // ServerURL holds the default location of the global charm store.
 // An alternate location can be configured by changing the URL field in the

@@ -80,7 +80,7 @@ func (s *charmStoreBaseSuite) startServer(c *gc.C) {
 	}
 
 	db := s.Session.DB("charmstore")
-	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V4)
+	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V5)
 	c.Assert(err, gc.IsNil)
 	s.handler = handler
 	s.srv = httptest.NewServer(handler)
