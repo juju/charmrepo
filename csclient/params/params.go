@@ -33,10 +33,7 @@ const (
 
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
-type MetaAnyResponse struct {
-	Id   *charm.URL
-	Meta map[string]interface{} `json:",omitempty"`
-}
+type MetaAnyResponse EntityResult
 
 // ArchiveUploadResponse holds the result of a post or a put to /id/archive.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#post-idarchive
@@ -110,11 +107,11 @@ type ArchiveUploadTimeResponse struct {
 type RelatedResponse struct {
 	// Requires holds an entry for each interface provided by
 	// the charm, containing all charms that require that interface.
-	Requires map[string][]MetaAnyResponse `json:",omitempty"`
+	Requires map[string][]EntityResult `json:",omitempty"`
 
 	// Provides holds an entry for each interface required by the
 	// the charm, containing all charms that provide that interface.
-	Provides map[string][]MetaAnyResponse `json:",omitempty"`
+	Provides map[string][]EntityResult `json:",omitempty"`
 }
 
 // RevisionInfoResponse holds the result of an id/meta/revision-info GET
