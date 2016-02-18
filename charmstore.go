@@ -95,12 +95,19 @@ type NewCharmStoreParams struct {
 // preserve the causes returned from the underlying csclient
 // methods.
 func NewCharmStore(p NewCharmStoreParams) *CharmStore {
+	client := csclient.New(csclient.Params{
+		URL:          p.URL,
+		HTTPClient:   p.HTTPClient,
+		VisitWebPage: p.VisitWebPage,
+	})
+	return NewCharmStoreFromClient(client)
+}
+
+// NewCharmStoreFromClient creates and returns a charm store repository.
+// The provided client is used for charm store requests.
+func NewCharmStoreFromClient(client CharmStoreClient) *CharmStore {
 	return &CharmStore{
-		client: csclient.New(csclient.Params{
-			URL:          p.URL,
-			HTTPClient:   p.HTTPClient,
-			VisitWebPage: p.VisitWebPage,
-		}),
+		client: client,
 	}
 }
 
