@@ -24,10 +24,47 @@ import (
 // CacheDir stores the charm cache directory path.
 var CacheDir string
 
+// CharmStoreClient exposes the functionality of csclient.Client needed here.
+type CharmStoreClient interface {
+	// GetArchive retrieves the archive for the given charm or bundle.
+	// It returns a reader from which the charm's data can be read,
+	// along with the fully qualified ID (charm URL) of the
+	// corresponding entity, the SHA384 hash of the data, and its size.
+	GetArchive(*charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error)
+
+	// Get makes a GET request to the given path in the charm store. The
+	// path must have a leading slash and not include the host name or
+	// version prefix. The result is parsed as JSON into the given result
+	// value, which should be a pointer to the expected data, but may be
+	// nil if no result is desired.
+	Get(path string, result interface{}) error
+
+	// Meta fetches the metadata of the identified charm or bundle.
+	// The result arg is a pointer to a value to be filled in with the
+	// metadata from the charm store. That pointer must be to a struct
+	// containing members corresponding to possible metadata include
+	// parameters.
+	// (see https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta)
+	//
+	// Meta() returns the fully qualified ID of the charm or bundle.
+	Meta(id *charm.URL, result interface{}) (*charm.URL, error)
+
+	// ServerURL returns the charm store URL used by the client.
+	ServerURL() string
+
+	// DisableStats disables incrementing download stats when retrieving
+	// archives from the charm store.
+	DisableStats()
+
+	// SetHTTPHeader sets custom HTTP headers that will be sent to the
+	// charm store on each request.
+	SetHTTPHeader(header http.Header)
+}
+
 // CharmStore is a repository Interface that provides access to the public Juju
 // charm store.
 type CharmStore struct {
-	client *csclient.Client
+	client CharmStoreClient
 }
 
 var _ Interface = (*CharmStore)(nil)
@@ -58,12 +95,19 @@ type NewCharmStoreParams struct {
 // preserve the causes returned from the underlying csclient
 // methods.
 func NewCharmStore(p NewCharmStoreParams) *CharmStore {
+	client := csclient.New(csclient.Params{
+		URL:          p.URL,
+		HTTPClient:   p.HTTPClient,
+		VisitWebPage: p.VisitWebPage,
+	})
+	return NewCharmStoreFromClient(client)
+}
+
+// NewCharmStoreFromClient creates and returns a charm store repository.
+// The provided client is used for charm store requests.
+func NewCharmStoreFromClient(client CharmStoreClient) *CharmStore {
 	return &CharmStore{
-		client: csclient.New(csclient.Params{
-			URL:          p.URL,
-			HTTPClient:   p.HTTPClient,
-			VisitWebPage: p.VisitWebPage,
-		}),
+		client: client,
 	}
 }
 

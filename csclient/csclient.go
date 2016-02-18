@@ -35,6 +35,7 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 
 // Client represents the client side of a charm store.
 type Client struct {
+	resourcesClient
 	params        Params
 	bclient       *httpbakery.Client
 	header        http.Header
@@ -99,6 +100,10 @@ func (c *Client) DisableStats() {
 func (c *Client) SetHTTPHeader(header http.Header) {
 	c.header = header
 }
+
+// TODO(ericsnow) Is the returned hash the base64-encoded
+// representation? If so then the doc comment should be clear
+// about that.
 
 // GetArchive retrieves the archive for the given charm or bundle, returning a
 // reader its data can be read from, the fully qualified id of the
