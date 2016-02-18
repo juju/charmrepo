@@ -26,27 +26,27 @@ var CacheDir string
 
 // CharmStoreClient exposes the functionality of csclient.Client needed here.
 type CharmStoreClient interface {
-	// GetArchive retrieves the archive for the given charm or bundle,
-	// returning a reader its data can be read from, the fully qualified
-	// id of the corresponding entity, the SHA384 hash of the data and
-	// its size.
+	// GetArchive retrieves the archive for the given charm or bundle.
+	// It returns a reader from which the charm's data can be read,
+	// along with the fully qualified ID (charm URL) of the
+	// corresponding entity, the SHA384 hash of the data, and its size.
 	GetArchive(*charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error)
 
-	// Get makes a GET request to the given path in the charm store (not
-	// including the host name or version prefix but including a leading /),
-	// parsing the result as JSON into the given result value, which should
-	// be a pointer to the expected data, but may be nil if no result is
-	// desired.
+	// Get makes a GET request to the given path in the charm store. The
+	// path must have a leading slash and not include the host name or
+	// version prefix. The result is parsed as JSON into the given result
+	// value, which should be a pointer to the expected data, but may be
+	// nil if no result is desired.
 	Get(path string, result interface{}) error
 
-	// Meta fetches metadata on the charm or bundle with the
-	// given id. The result value provides a value
-	// to be filled in with the result, which must be
-	// a pointer to a struct containing members corresponding
-	// to possible metadata include parameters
-	// (see https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta).
+	// Meta fetches the metadata of the identified charm or bundle.
+	// The result arg is a pointer to a value to be filled in with the
+	// metadata from the charm store. That pointer must be to a struct
+	// containing members corresponding to possible metadata include
+	// parameters.
+	// (see https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta)
 	//
-	// It returns the fully qualified id of the entity.
+	// Meta() returns the fully qualified ID of the charm or bundle.
 	Meta(id *charm.URL, result interface{}) (*charm.URL, error)
 
 	// ServerURL returns the charm store URL used by the client.
