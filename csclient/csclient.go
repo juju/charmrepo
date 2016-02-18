@@ -35,6 +35,7 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 
 // Client represents the client side of a charm store.
 type Client struct {
+	resourcesClient
 	params        Params
 	bclient       *httpbakery.Client
 	header        http.Header
