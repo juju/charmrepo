@@ -100,6 +100,10 @@ func (c *Client) SetHTTPHeader(header http.Header) {
 	c.header = header
 }
 
+// TODO(ericsnow) Is the returned hash the base64-encoded
+// representation? If so then the doc comment should be clear
+// about that.
+
 // GetArchive retrieves the archive for the given charm or bundle, returning a
 // reader its data can be read from, the fully qualified id of the
 // corresponding entity, the SHA384 hash of the data and its size.
