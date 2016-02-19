@@ -100,13 +100,9 @@ func (c *Client) SetHTTPHeader(header http.Header) {
 	c.header = header
 }
 
-// TODO(ericsnow) Is the returned hash the base64-encoded
-// representation? If so then the doc comment should be clear
-// about that.
-
 // GetArchive retrieves the archive for the given charm or bundle, returning a
 // reader its data can be read from, the fully qualified id of the
-// corresponding entity, the SHA384 hash of the data and its size.
+// corresponding entity, the hex-encoded SHA384 hash of the data and its size.
 func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error) {
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
@@ -244,9 +240,9 @@ func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulg
 }
 
 // uploadArchive pushes the archive for the charm or bundle represented by
-// the given body, its SHA384 hash and its size. It returns the resulting
-// entity reference. The given id should include the series and should not
-// include the revision.
+// the given body, its hex-encoded SHA384 hash and its size. It returns
+// the resulting entity reference. The given id should include the series
+// and should not include the revision.
 func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
 	// When uploading archives, it can be a problem that the
 	// an error response is returned while we are still writing

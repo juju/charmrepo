@@ -29,7 +29,8 @@ type CharmStoreClient interface {
 	// GetArchive retrieves the archive for the given charm or bundle.
 	// It returns a reader from which the charm's data can be read,
 	// along with the fully qualified ID (charm URL) of the
-	// corresponding entity, the SHA384 hash of the data, and its size.
+	// corresponding entity, the hex-encoded SHA384 hash of the data,
+	// and its size.
 	GetArchive(*charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error)
 
 	// Get makes a GET request to the given path in the charm store. The
