@@ -190,15 +190,11 @@ func (s *charmStoreRepoSuite) checkCharmDownloads(c *gc.C, url *charm.URL, expec
 }
 
 func (s *charmStoreRepoSuite) TestNewCharmStoreFromClient(c *gc.C) {
-	stub := &jujutesting.Stub{}
-	client := &stubCharmStoreClient{Stub: stub}
-	serverURL := "<some server URL>"
-	client.ReturnServerURL = serverURL
+	client := csclient.New(csclient.Params{URL: csclient.ServerURL})
 
 	repo := charmrepo.NewCharmStoreFromClient(client)
 
-	stub.CheckNoCalls(c)
-	c.Check(repo.URL(), gc.Equals, serverURL)
+	c.Check(repo.URL(), gc.Equals, csclient.ServerURL)
 }
 
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
@@ -626,72 +622,4 @@ func checkCharm(c *gc.C, ch, expect charm.Charm) {
 	c.Assert(ch.Actions(), jc.DeepEquals, expect.Actions())
 	c.Assert(ch.Config(), jc.DeepEquals, expect.Config())
 	c.Assert(ch.Meta(), jc.DeepEquals, expect.Meta())
-}
-
-type stubCharmStoreClient struct {
-	*jujutesting.Stub
-
-	ReturnGetArchive struct {
-		reader io.ReadCloser
-		fullID *charm.URL
-		hash   string
-		size   int64
-	}
-	ReturnGet  interface{}
-	ReturnMeta struct {
-		result interface{}
-		fullID *charm.URL
-	}
-	ReturnServerURL string
-}
-
-func (s *stubCharmStoreClient) GetArchive(id *charm.URL) (io.ReadCloser, *charm.URL, string, int64, error) {
-	s.AddCall("GetArchive", id)
-	if err := s.NextErr(); err != nil {
-		return nil, nil, "", 0, err
-	}
-
-	return s.ReturnGetArchive.reader, s.ReturnGetArchive.fullID, s.ReturnGetArchive.hash, s.ReturnGetArchive.size, nil
-}
-
-func (s *stubCharmStoreClient) Get(path string, result interface{}) error {
-	s.AddCall("Get", path, result)
-	if err := s.NextErr(); err != nil {
-		return err
-	}
-
-	if result == nil {
-		return nil
-	}
-	// TODO(ericsnow) Type assert result and s.ReturnGet, then copy
-	// s.ReturnGet into result.
-	return nil
-}
-
-func (s *stubCharmStoreClient) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
-	s.AddCall("Meta", id, result)
-	if err := s.NextErr(); err != nil {
-		return nil, err
-	}
-
-	// TODO(ericsnow) Type assert result and s.ReturnMeta.result, then
-	// copy s.ReturnMeta.result into result.
-	return s.ReturnMeta.fullID, nil
-}
-
-func (s *stubCharmStoreClient) ServerURL() string {
-	s.AddCall("ServerURL")
-	s.NextErr() // Pop one off.
-
-	return s.ReturnServerURL
-}
-
-func (s *stubCharmStoreClient) DisableStats() {
-	s.AddCall("DisableStats")
-	s.NextErr() // Pop one off.
-}
-
-func (s *stubCharmStoreClient) SetHTTPHeader(header http.Header) {
-	s.AddCall("SetHTTPHeader", header)
-	s.NextErr() // Pop one off.
 }
