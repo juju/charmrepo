@@ -189,6 +189,14 @@ func (s *charmStoreRepoSuite) checkCharmDownloads(c *gc.C, url *charm.URL, expec
 	c.Errorf("downloads count for %s is %d, expected %d", url, count, expect)
 }
 
+func (s *charmStoreRepoSuite) TestNewCharmStoreFromClient(c *gc.C) {
+	client := csclient.New(csclient.Params{URL: csclient.ServerURL})
+
+	repo := charmrepo.NewCharmStoreFromClient(client)
+
+	c.Check(repo.URL(), gc.Equals, csclient.ServerURL)
+}
+
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
 	expect, url := s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
 	ch, err := s.repo.Get(url)
