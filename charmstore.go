@@ -210,55 +210,26 @@ func verifyHash384AndSize(path, expectHash string, expectSize int64) error {
 	return nil
 }
 
-// Latest implements Interface.Latest.
+// Latest returns the most current revision for each of the identified
+// charms. The revision in the provided charm URLs is ignored.
 func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
-	if len(curls) == 0 {
-		return nil, nil
+	results, err := s.client.Latest(curls)
+	if err != nil {
+		return nil, err
 	}
 
-	// Prepare the request to the charm store.
-	urls := make([]string, len(curls))
-	values := url.Values{}
-	// Include the ignore-auth flag so that non-public results do not generate
-	// an error for the whole request.
-	values.Add("ignore-auth", "1")
-	values.Add("include", "id-revision")
-	values.Add("include", "hash256")
-	for i, curl := range curls {
-		url := curl.WithRevision(-1).String()
-		urls[i] = url
-		values.Add("id", url)
-	}
-	u := url.URL{
-		Path:     "/meta/any",
-		RawQuery: values.Encode(),
-	}
-
-	// Execute the request and retrieve results.
-	var results map[string]struct {
-		Meta struct {
-			IdRevision params.IdRevisionResponse `json:"id-revision"`
-			Hash256    params.HashResponse       `json:"hash256"`
+	var responses []CharmRevision
+	for i, result := range results {
+		response := CharmRevision{
+			Revision: result.Revision,
+			Sha256:   result.Sha256,
+			Err:      result.Err,
 		}
-	}
-	if err := s.client.Get(u.String(), &results); err != nil {
-		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
-	}
-
-	// Build the response.
-	responses := make([]CharmRevision, len(curls))
-	for i, url := range urls {
-		result, found := results[url]
-		if !found {
-			responses[i] = CharmRevision{
-				Err: CharmNotFound(url),
-			}
-			continue
+		if errgo.Cause(result.Err) == params.ErrNotFound {
+			curl := curls[i].WithRevision(-1)
+			response.Err = CharmNotFound(curl.String())
 		}
-		responses[i] = CharmRevision{
-			Revision: result.Meta.IdRevision.Revision,
-			Sha256:   result.Meta.Hash256.Sum,
-		}
+		responses = append(responses, response)
 	}
 	return responses, nil
 }

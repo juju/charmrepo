@@ -5,6 +5,7 @@ package csclient_test
 
 import (
 	"bytes"
+	"crypto/sha256"
 	"crypto/sha512"
 	"encoding/json"
 	"fmt"
@@ -1511,4 +1512,134 @@ func (s *suite) setPublic(c *gc.C, id *charm.URL) {
 	// Allow read permissions to everyone.
 	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
 	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *suite) TestLatest(c *gc.C) {
+	// Add some charms to the charm store.
+	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
+	s.addCharm(c, "~who/precise/wordpress-1", "wordpress")
+	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
+	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
+	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
+	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
+
+	// Change permissions on one of the charms so that it is not readable by
+	// anyone.
+	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Calculate and store the expected hashes for the uploaded charms.
+	mysqlHash := hashOfCharm(c, "mysql")
+	wordpressHash := hashOfCharm(c, "wordpress")
+	riakHash := hashOfCharm(c, "riak")
+
+	// Define the tests to be run.
+	tests := []struct {
+		about string
+		urls  []*charm.URL
+		revs  []params.CharmRevision
+	}{{
+		about: "no urls",
+	}, {
+		about: "charm not found",
+		urls:  []*charm.URL{charm.MustParseURL("cs:trusty/no-such-42")},
+		revs: []params.CharmRevision{{
+			Err: params.ErrNotFound,
+		}},
+	}, {
+		about: "resolve",
+		urls: []*charm.URL{
+			charm.MustParseURL("cs:~who/trusty/mysql-42"),
+			charm.MustParseURL("cs:~who/trusty/mysql-0"),
+			charm.MustParseURL("cs:~who/trusty/mysql"),
+		},
+		revs: []params.CharmRevision{{
+			Revision: 0,
+			Sha256:   mysqlHash,
+		}, {
+			Revision: 0,
+			Sha256:   mysqlHash,
+		}, {
+			Revision: 0,
+			Sha256:   mysqlHash,
+		}},
+	}, {
+		about: "multiple charms",
+		urls: []*charm.URL{
+			charm.MustParseURL("cs:~who/precise/wordpress"),
+			charm.MustParseURL("cs:~who/trusty/mysql-47"),
+			charm.MustParseURL("cs:~dalek/trusty/no-such"),
+			charm.MustParseURL("cs:~dalek/trusty/riak-0"),
+		},
+		revs: []params.CharmRevision{{
+			Revision: 1,
+			Sha256:   wordpressHash,
+		}, {
+			Revision: 0,
+			Sha256:   mysqlHash,
+		}, {
+			Err: params.ErrNotFound,
+		}, {
+			Revision: 3,
+			Sha256:   riakHash,
+		}},
+	}, {
+		about: "unauthorized",
+		urls: []*charm.URL{
+			charm.MustParseURL("cs:~who/precise/wordpress"),
+			url,
+		},
+		revs: []params.CharmRevision{{
+			Revision: 1,
+			Sha256:   wordpressHash,
+		}, {
+			Err: params.ErrNotFound,
+		}},
+	}}
+
+	// Run the tests.
+	for i, test := range tests {
+		c.Logf("test %d: %s", i, test.about)
+		revs, err := s.client.Latest(test.urls)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Check(revs, jc.DeepEquals, test.revs)
+	}
+}
+
+// addCharm uploads a charm a promulgated revision to the testing charm store
+func (s *suite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
+	id := charm.MustParseURL(urlStr)
+	promulgatedRevision := -1
+	if id.User == "" {
+		id.User = "who"
+		promulgatedRevision = id.Revision
+	}
+	ch := charmRepo.CharmArchive(c.MkDir(), name)
+
+	// Upload the charm.
+	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
+	c.Assert(err, gc.IsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
+
+	return ch, id
+}
+
+// hashOfCharm returns the SHA256 hash sum for the given charm name.
+func hashOfCharm(c *gc.C, name string) string {
+	path := charmRepo.CharmArchivePath(c.MkDir(), name)
+	return hashOfPath(c, path)
+}
+
+// hashOfPath returns the SHA256 hash sum for the given path.
+func hashOfPath(c *gc.C, path string) string {
+	f, err := os.Open(path)
+	c.Assert(err, jc.ErrorIsNil)
+	defer f.Close()
+	hash := sha256.New()
+	_, err = io.Copy(hash, f)
+	c.Assert(err, jc.ErrorIsNil)
+	return fmt.Sprintf("%x", hash.Sum(nil))
 }
