@@ -16,6 +16,7 @@ import (
 	neturl "net/url"
 	"os"
 	"reflect"
+	"sort"
 	"strings"
 	"time"
 
@@ -1604,6 +1605,40 @@ func (s *suite) TestLatest(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Check(revs, jc.DeepEquals, test.revs)
 	}
+}
+
+func (s *suite) TestGetWithJujuAttrs(c *gc.C) {
+	_, url := s.addCharm(c, "trusty/riak-0", "riak")
+
+	// Set up a proxy server that stores the request header.
+	var header http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		header = r.Header
+		s.handler.ServeHTTP(w, r)
+	}))
+	defer srv.Close()
+
+	// Make a first request without Juju attrs.
+	_, _, _, _, err := s.client.GetArchive(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(header.Get(csclient.JujuMetadataHTTPHeader), gc.Equals, "")
+
+	// Make a second request after setting Juju attrs.
+	client := s.client.WithJujuAttrs(map[string]string{
+		"k1": "v1",
+		"k2": "v2",
+	})
+	_, _, _, _, err = s.client.GetArchive(url)
+	c.Assert(err, jc.ErrorIsNil)
+	values := header[http.CanonicalHeaderKey(csclient.JujuMetadataHTTPHeader)]
+	sort.Strings(values)
+	c.Assert(values, jc.DeepEquals, []string{"k1=v1", "k2=v2"})
+
+	// Make a third request after restoring empty attrs.
+	client = client.WithJujuAttrs(nil)
+	_, _, _, _, err = s.client.GetArchive(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(header.Get(csclient.JujuMetadataHTTPHeader), gc.Equals, "")
 }
 
 // addCharm uploads a charm a promulgated revision to the testing charm store

@@ -273,16 +273,12 @@ func (s *CharmStore) WithTestMode() *CharmStore {
 
 // JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
 // attributes to the charm store.
-const JujuMetadataHTTPHeader = "Juju-Metadata"
+const JujuMetadataHTTPHeader = csclient.JujuMetadataHTTPHeader
 
 // WithJujuAttrs returns a repository Interface with the Juju metadata
 // attributes set.
 func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	newRepo := *s
-	header := make(http.Header)
-	for k, v := range attrs {
-		header.Add(JujuMetadataHTTPHeader, k+"="+v)
-	}
-	newRepo.client.SetHTTPHeader(header)
+	newRepo.client = newRepo.client.WithJujuAttrs(attrs)
 	return &newRepo
 }
