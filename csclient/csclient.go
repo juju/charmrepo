@@ -2,7 +2,7 @@
 // Licensed under the LGPLv3, see LICENCE file for details.
 
 // The csclient package provides access to the charm store API.
-package csclient
+package csclient // import "gopkg.in/juju/charmrepo.v2-unstable/csclient"
 
 import (
 	"bytes"

@@ -3,7 +3,7 @@
 
 // Package charmrepo implements access to charm repositories.
 
-package charmrepo
+package charmrepo // import "gopkg.in/juju/charmrepo.v2-unstable"
 
 import (
 	"fmt"
