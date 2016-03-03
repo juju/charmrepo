@@ -298,22 +298,27 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 }
 
 func (s *suite) TestPutWithResponseSuccess(c *gc.C) {
-	err := s.client.UploadCharmWithRevision(
-		charm.MustParseURL("~charmers/development/wily/wordpress-42"),
-		charmRepo.CharmDir("wordpress"),
-		42)
-	c.Assert(err, gc.IsNil)
-
-	publish := &params.PublishRequest{
-		Published: true,
+	// There are currently no endpoints that return a response
+	// on PUT, so we'll create a fake server just to test
+	// the PutWithResponse method.
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		io.Copy(w, req.Body)
 	}
-	var result params.PublishResponse
-	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, &result)
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	defer srv.Close()
+	client := csclient.New(csclient.Params{
+		URL: srv.URL,
+	})
+
+	sendBody := "hello"
+
+	var result string
+	err := client.PutWithResponse("/somewhere", sendBody, &result)
 	c.Assert(err, gc.IsNil)
-	c.Assert(result.Id, jc.DeepEquals, charm.MustParseURL("~charmers/wily/wordpress-42"))
+	c.Assert(result, gc.Equals, sendBody)
 
 	// Check that the method accepts a nil result.
-	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, nil)
+	err = client.PutWithResponse("/somewhere", sendBody, nil)
 	c.Assert(err, gc.IsNil)
 }
 
