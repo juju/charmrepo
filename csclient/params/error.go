@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package params
+package params // import "gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 import (
 	"fmt"

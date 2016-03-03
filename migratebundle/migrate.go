@@ -1,4 +1,4 @@
-package migratebundle
+package migratebundle // import "gopkg.in/juju/charmrepo.v2-unstable/migratebundle"
 
 import (
 	"fmt"
