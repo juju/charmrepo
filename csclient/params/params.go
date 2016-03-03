@@ -31,6 +31,23 @@ const (
 	Admin    = "admin"
 )
 
+// Channel is the name of a channel in which an entity may be published.
+type Channel string
+
+const (
+	// DevelopmentChannel is the channel used for charms or bundles under development.
+	DevelopmentChannel Channel = "development"
+
+	// StableChannel is the channel used for stable charms or bundles.
+	StableChannel Channel = "stable"
+
+	// UnpublishedChannel is the default channel to which charms are uploaded.
+	UnpublishedChannel Channel = "unpublished"
+
+	// NoChannel represents where no channel has been specifically requested.
+	NoChannel Channel = ""
+)
+
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
 type MetaAnyResponse EntityResult
@@ -238,6 +255,9 @@ type PromulgateRequest struct {
 // PublishRequest holds the request of an id/publish PUT request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
 type PublishRequest struct {
+	Channels []Channel
+	// TODO(rog) remove this when we've updated the charmstore dependency
+	// to use the new PublishRequest type.
 	Published bool
 }
 
