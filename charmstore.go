@@ -337,13 +337,13 @@ func (c *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 	}, nil
 }
 
-func (c *CharmStore) Publish(id *charm.URL, resources map[string]int) error {
+func (c *CharmStore) Publish(id *charm.URL, resources map[string]int) (*charm.URL, error) {
 	val := &params.PublishRequest{
 		Published: true,
 		Resources: resources,
 	}
 	var result params.PublishResponse
-	if err := client.PutWithResponse("/"+id.Path()+"/publish", val, &result); err != nil {
+	if err := c.client.PutWithResponse("/"+id.Path()+"/publish", val, &result); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return result.Id, nil
