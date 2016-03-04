@@ -13,7 +13,6 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/url"
-	"os"
 	"reflect"
 	"strconv"
 	"strings"
@@ -159,7 +158,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 }
 
 // ListResources retrieves the metadata about resources for the given charm.
-func (c *Client) ListResources(ids ...*charm.URL) (map[string][]params.Resource, error) {
+func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
 	// Prepare the request to the charm store.
 	urls := make([]string, len(ids))
 	values := url.Values{}
@@ -184,12 +183,7 @@ func (c *Client) ListResources(ids ...*charm.URL) (map[string][]params.Resource,
 }
 
 // UploadResource uploads the bytes for a resource.
-func (c *Client) UploadResource(id *charm.URL, name, path string) (revision int, err error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return -1, errgo.Mask(err)
-	}
-	defer file.Close()
+func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSeeker) (revision int, err error) {
 	hash, size, err := readerHashAndSize(file)
 	if err != nil {
 		return -1, errgo.Mask(err)
@@ -231,17 +225,22 @@ type ResourceData struct {
 	Size     int64
 }
 
-// GetResource retrieves the archive for the given charm or bundle, returning a
-// reader its data can be read from, the fully qualified id of the
-// corresponding entity, the SHA384 hash of the data and its size.
-func (c *Client) GetResource(id *charm.URL, name string) (result ResourceData, err error) {
+// GetResource retrieves byes of the resource with the given name and revision
+// for the given charm, returning a reader its data can be read from,  the
+// SHA384 hash of the data and its size.  If revision is -1, the latest revision
+// of the resource will be retrieved.
+func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		return result, errgo.Notef(err, "cannot make new request")
 	}
 
-	resp, err := c.Do(req, "/"+id.Path()+"/resource/"+name)
+	url := "/" + id.Path() + "/resource/" + name
+	if revision >= 0 {
+		url += "/" + strconv.Itoa(revision)
+	}
+	resp, err := c.Do(req, url)
 	if err != nil {
 		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)
 	}
@@ -256,7 +255,7 @@ func (c *Client) GetResource(id *charm.URL, name string) (result ResourceData, e
 	if revisionStr == "" {
 		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
 	}
-	revision, err := strconv.Atoi(revisionStr)
+	revision, err = strconv.Atoi(revisionStr)
 	if err != nil {
 		return result, errgo.Notef(err, "invalid resource revision found in response")
 	}

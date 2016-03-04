@@ -240,12 +240,12 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 	return responses, nil
 }
 
-func (s *CharmStore) ListResources(ids ...*charm.URL) ([]ResourceResult, error) {
+func (s *CharmStore) ListResources(ids []*charm.URL) ([]ResourceResult, error) {
 	if len(ids) == 0 {
 		return nil, nil
 	}
 
-	results, err := s.client.ListResources(ids...)
+	results, err := s.client.ListResources(ids)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
@@ -263,6 +263,10 @@ func (s *CharmStore) ListResources(ids ...*charm.URL) ([]ResourceResult, error) 
 			if err != nil {
 				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
 			}
+			origin, err := apiOrigin2Origin(res.Origin)
+			if err != nil {
+				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
+			}
 			fp, err := resource.ParseFingerprint(res.Fingerprint)
 			if err != nil {
 				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
@@ -274,6 +278,7 @@ func (s *CharmStore) ListResources(ids ...*charm.URL) ([]ResourceResult, error) 
 					Path:        res.Path,
 					Description: res.Description,
 				},
+				Origin:      origin,
 				Revision:    res.Revision,
 				Fingerprint: fp,
 				Size:        res.Size,
@@ -285,7 +290,12 @@ func (s *CharmStore) ListResources(ids ...*charm.URL) ([]ResourceResult, error) 
 }
 
 func (c *CharmStore) UploadResource(id *charm.URL, name, filename string) (revision int, err error) {
-	rev, err := c.client.UploadResource(id, name, filename)
+	f, err := os.Open(filename)
+	if err != nil {
+		return -1, errgo.Mask(err, errgo.Any)
+	}
+	defer f.Close()
+	rev, err := c.client.UploadResource(id, name, filename, f)
 	if err != nil {
 		return rev, errgo.Mask(err, errgo.Any)
 	}
@@ -299,8 +309,14 @@ type ResourceData struct {
 	Fingerprint resource.Fingerprint
 }
 
-func (c *CharmStore) GetResource(id *charm.URL, name string) (result ResourceData, err error) {
-	data, err := c.client.GetResource(id, name)
+// GetResource returns the bytes for the latest revision of the given resource.
+func (c *CharmStore) GetLatestResource(id *charm.URL, name string) (result ResourceData, err error) {
+	return c.GetResource(id, -1, name)
+}
+
+// GetResource returns the bytes for the specified revision of the given resource.
+func (c *CharmStore) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
+	data, err := c.client.GetResource(id, revision, name)
 	if err != nil {
 		return result, errgo.Mask(err, errgo.Any)
 	}
@@ -310,7 +326,9 @@ func (c *CharmStore) GetResource(id *charm.URL, name string) (result ResourceDat
 		}
 	}()
 	fp, err := resource.ParseFingerprint(data.Hash)
-	return result, errgo.Mask(err, errgo.Any)
+	if err != nil {
+		return result, errgo.Mask(err, errgo.Any)
+	}
 	return ResourceData{
 		ReadCloser:  data.ReadCloser,
 		Size:        data.Size,
@@ -319,12 +337,35 @@ func (c *CharmStore) GetResource(id *charm.URL, name string) (result ResourceDat
 	}, nil
 }
 
+func (c *CharmStore) Publish(id *charm.URL, resources map[string]int) error {
+	val := &params.PublishRequest{
+		Published: true,
+		Resources: resources,
+	}
+	var result params.PublishResponse
+	if err := client.PutWithResponse("/"+id.Path()+"/publish", val, &result); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return result.Id, nil
+}
+
 func apiResourceType2ResourceType(t params.ResourceType) (resource.Type, error) {
 	switch t {
 	case params.FileResource:
 		return resource.TypeFile, nil
 	default:
 		return 0, errgo.Newf("unknown resource type: %v", t)
+	}
+}
+
+func apiOrigin2Origin(origin params.Origin) (resource.Origin, error) {
+	switch origin {
+	case params.OriginStore:
+		return resource.OriginStore, nil
+	case params.OriginUpload:
+		return resource.OriginUpload, nil
+	default:
+		return 0, errgo.Newf("unknown origin: %v", origin)
 	}
 }
 
