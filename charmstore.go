@@ -16,6 +16,7 @@ import (
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -237,6 +238,94 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 		}
 	}
 	return responses, nil
+}
+
+func (s *CharmStore) ListResources(ids ...*charm.URL) ([]ResourceResult, error) {
+	if len(ids) == 0 {
+		return nil, nil
+	}
+
+	results, err := s.client.ListResources(ids...)
+	if err != nil {
+		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
+	}
+
+	result := make([]ResourceResult, len(ids))
+	for i, id := range ids {
+		resources, ok := results[id.String()]
+		if !ok {
+			result[i].Err = CharmNotFound(id.String())
+			continue
+		}
+		list := make([]resource.Resource, len(resources))
+		for j, res := range resources {
+			resType, err := apiResourceType2ResourceType(res.Type)
+			if err != nil {
+				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
+			}
+			fp, err := resource.ParseFingerprint(res.Fingerprint)
+			if err != nil {
+				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
+			}
+			list[j] = resource.Resource{
+				Meta: resource.Meta{
+					Name:        res.Name,
+					Type:        resType,
+					Path:        res.Path,
+					Description: res.Description,
+				},
+				Revision:    res.Revision,
+				Fingerprint: fp,
+				Size:        res.Size,
+			}
+		}
+		result[i].Resources = list
+	}
+	return result, nil
+}
+
+func (c *CharmStore) UploadResource(id *charm.URL, name, filename string) (revision int, err error) {
+	rev, err := c.client.UploadResource(id, name, filename)
+	if err != nil {
+		return rev, errgo.Mask(err, errgo.Any)
+	}
+	return rev, nil
+}
+
+type ResourceData struct {
+	io.ReadCloser
+	Size        int64
+	Revision    int
+	Fingerprint resource.Fingerprint
+}
+
+func (c *CharmStore) GetResource(id *charm.URL, name string) (result ResourceData, err error) {
+	data, err := c.client.GetResource(id, name)
+	if err != nil {
+		return result, errgo.Mask(err, errgo.Any)
+	}
+	defer func() {
+		if err != nil {
+			data.Close()
+		}
+	}()
+	fp, err := resource.ParseFingerprint(data.Hash)
+	return result, errgo.Mask(err, errgo.Any)
+	return ResourceData{
+		ReadCloser:  data.ReadCloser,
+		Size:        data.Size,
+		Revision:    data.Revision,
+		Fingerprint: fp,
+	}, nil
+}
+
+func apiResourceType2ResourceType(t params.ResourceType) (resource.Type, error) {
+	switch t {
+	case params.FileResource:
+		return resource.TypeFile, nil
+	default:
+		return 0, errgo.Newf("unknown resource type: %v", t)
+	}
 }
 
 // Resolve implements Interface.Resolve.

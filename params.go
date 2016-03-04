@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 )
 
 // InfoResponse is sent by the charm store in response to charm-info requests.
@@ -35,6 +36,13 @@ type CharmRevision struct {
 	Revision int
 	Sha256   string
 	Err      error
+}
+
+// ResourceResult holds the resources for a given charm and any error
+// encountered in retrieving them.
+type ResourceResult struct {
+	Resources []resource.Resource
+	Err       error
 }
 
 // NotFoundError represents an error indicating that the requested data wasn't found.
