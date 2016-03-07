@@ -546,7 +546,7 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	}
 	if c.channel != params.NoChannel {
 		values := u.Query()
-		values.Add("channel", string(c.channel))
+		values.Set("channel", string(c.channel))
 		u.RawQuery = values.Encode()
 	}
 	req.URL = u

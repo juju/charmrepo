@@ -1017,7 +1017,10 @@ func (s *suite) TestWithChannel(c *gc.C) {
 	}
 
 	c.Assert(makeRequest(client), gc.Equals, "")
-	c.Assert(makeRequest(client.WithChannel(params.DevelopmentChannel)), gc.Equals, "channel=development")
+	devClient := client.WithChannel(params.DevelopmentChannel)
+	c.Assert(makeRequest(devClient), gc.Equals, "channel=development")
+	// Ensure the original client has not been mutated.
+	c.Assert(makeRequest(client), gc.Equals, "")
 }
 
 var metaBadTypeTests = []struct {
