@@ -39,6 +39,7 @@ type Client struct {
 	bclient       *httpbakery.Client
 	header        http.Header
 	statsDisabled bool
+	channel       params.Channel
 }
 
 // Params holds parameters for creating a new charm store client.
@@ -92,6 +93,14 @@ func (c *Client) ServerURL() string {
 // from the charm store.
 func (c *Client) DisableStats() {
 	c.statsDisabled = true
+}
+
+// WithChannel returns a new client whose requests are done using the
+// given channel.
+func (c *Client) WithChannel(channel params.Channel) *Client {
+	client := *c
+	client.channel = channel
+	return &client
 }
 
 // SetHTTPHeader sets custom HTTP headers that will be sent to the charm store
@@ -534,6 +543,11 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	u, err := url.Parse(c.params.URL + "/" + apiVersion + path)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if c.channel != params.NoChannel {
+		values := u.Query()
+		values.Set("channel", string(c.channel))
+		u.RawQuery = values.Encode()
 	}
 	req.URL = u
 
