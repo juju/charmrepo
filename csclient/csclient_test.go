@@ -997,6 +997,29 @@ func (s *suite) TestDo(c *gc.C) {
 	c.Assert(string(data), gc.Equals, `"bar"`)
 }
 
+func (s *suite) TestWithChannel(c *gc.C) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprint(w, req.URL.Query().Encode())
+	}))
+	client := csclient.New(csclient.Params{
+		URL: srv.URL,
+	})
+
+	makeRequest := func(client *csclient.Client) string {
+		req, err := http.NewRequest("GET", "", nil)
+		c.Assert(err, jc.ErrorIsNil)
+		resp, err := client.DoWithBody(req, "/", nil)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+		b, err := ioutil.ReadAll(resp.Body)
+		c.Assert(err, jc.ErrorIsNil)
+		return string(b)
+	}
+
+	c.Assert(makeRequest(client), gc.Equals, "")
+	c.Assert(makeRequest(client.WithChannel(params.DevelopmentChannel)), gc.Equals, "channel=development")
+}
+
 var metaBadTypeTests = []struct {
 	result      interface{}
 	expectError string
