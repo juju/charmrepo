@@ -239,6 +239,7 @@ type PromulgateRequest struct {
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
 type PublishRequest struct {
 	Published bool
+	Resources map[string]int `json:",omitempty"`
 }
 
 // PublishResponse holds the result of an id/publish PUT request.
