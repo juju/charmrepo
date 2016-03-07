@@ -239,6 +239,11 @@ type PromulgateRequest struct {
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
 type PublishRequest struct {
 	Published bool
+	// Resources defines the resource revisions to use for the charm.
+	// Each resource in the charm's metadata.yaml (if any) must have its
+	// name mapped to a revision. That revision must be one of the
+	// existing revisions for that resource.
+	Resources map[string]int `json:",omitempty"`
 }
 
 // PublishResponse holds the result of an id/publish PUT request.
