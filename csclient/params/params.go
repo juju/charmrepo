@@ -263,25 +263,25 @@ type WhoAmIResponse struct {
 // Resource describes a resource in the charm store.
 type Resource struct {
 	// Name identifies the resource.
-	Name string `json:"name"`
+	Name string
 
 	// Type is the name of the resource type.
-	Type string `json:"type"`
+	Type string
 
 	// Path is where the resource will be stored.
-	Path string `json:"path"`
+	Path string
 
 	// Description contains user-facing info about the resource.
-	Description string `json:"description,omitempty"`
+	Description string `json:",omitempty"`
 
 	// Origin is where the resource will come from.
-	Origin string `json:"origin"`
+	Origin string
 
 	// Revision is the revision, if applicable.
-	Revision int `json:"revision"`
+	Revision int
 
 	// Fingerprint is the SHA-384 checksum for the resource blob.
-	Fingerprint []byte `json:"fingerprint"`
+	Fingerprint []byte
 
 	// Size is the size of the resource, in bytes.
 	Size int64
