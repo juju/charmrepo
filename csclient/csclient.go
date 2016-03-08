@@ -270,7 +270,6 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 
 	// Validate the response contents.
 	if resp.ContentLength < 0 {
-		// TODO frankban: handle the case the contents are chunked.
 		return result, errgo.Newf("no content length found in response")
 	}
 	return ResourceData{
