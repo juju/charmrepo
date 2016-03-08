@@ -37,7 +37,7 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 // Client represents the client side of a charm store.
 type Client struct {
 	params        Params
-	bclient       *httpbakery.Client
+	bclient       httpClient
 	header        http.Header
 	statsDisabled bool
 }
@@ -65,6 +65,10 @@ type Params struct {
 	// the user visits a web page to authenticate themselves.
 	// If nil, no interaction will be allowed.
 	VisitWebPage func(url *url.URL) error
+}
+
+type httpClient interface {
+	DoWithBody(*http.Request, io.ReadSeeker) (*http.Response, error)
 }
 
 // New returns a new charm store client.

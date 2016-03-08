@@ -28,7 +28,7 @@ var CacheDir string
 // CharmStore is a repository Interface that provides access to the public Juju
 // charm store.
 type CharmStore struct {
-	client *csclient.Client
+	client apiClient
 }
 
 var _ Interface = (*CharmStore)(nil)
@@ -50,6 +50,12 @@ type NewCharmStoreParams struct {
 	// the user visits a web page to authenticate themselves.
 	// If nil, a default function that returns an error will be used.
 	VisitWebPage func(url *url.URL) error
+
+	// User and Password hold the authentication credentials
+	// for the client. If User is empty, no credentials will be
+	// sent.
+	User     string
+	Password string
 }
 
 // NewCharmStore creates and returns a charm store repository.
@@ -63,6 +69,8 @@ func NewCharmStore(p NewCharmStoreParams) *CharmStore {
 		URL:          p.URL,
 		HTTPClient:   p.HTTPClient,
 		VisitWebPage: p.VisitWebPage,
+		User:         p.User,
+		Password:     p.Password,
 	})
 	return NewCharmStoreFromClient(client)
 }
@@ -259,34 +267,43 @@ func (s *CharmStore) ListResources(ids []*charm.URL) ([]ResourceResult, error) {
 		}
 		list := make([]resource.Resource, len(resources))
 		for j, res := range resources {
-			resType, err := apiResourceType2ResourceType(res.Type)
+			resource, err := apiResource2Resource(res)
 			if err != nil {
-				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
+				return nil, errgo.Notef(err, "got bad data from server for resource %q", res.Name)
 			}
-			origin, err := apiOrigin2Origin(res.Origin)
-			if err != nil {
-				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
-			}
-			fp, err := resource.ParseFingerprint(res.Fingerprint)
-			if err != nil {
-				return nil, errgo.Notef(err, "bad data returned for resource %q", res.Name)
-			}
-			list[j] = resource.Resource{
-				Meta: resource.Meta{
-					Name:        res.Name,
-					Type:        resType,
-					Path:        res.Path,
-					Description: res.Description,
-				},
-				Origin:      origin,
-				Revision:    res.Revision,
-				Fingerprint: fp,
-				Size:        res.Size,
-			}
+			list[j] = resource
 		}
 		result[i].Resources = list
 	}
 	return result, nil
+}
+
+func apiResource2Resource(res params.Resource) (resource.Resource, error) {
+	var result resource.Resource
+	resType, err := apiResourceType2ResourceType(res.Type)
+	if err != nil {
+		return result, errgo.Mask(err, errgo.Any)
+	}
+	origin, err := apiOrigin2Origin(res.Origin)
+	if err != nil {
+		return result, errgo.Mask(err, errgo.Any)
+	}
+	fp, err := resource.ParseFingerprint(res.Fingerprint)
+	if err != nil {
+		return result, errgo.Mask(err, errgo.Any)
+	}
+	return resource.Resource{
+		Meta: resource.Meta{
+			Name:        res.Name,
+			Type:        resType,
+			Path:        res.Path,
+			Description: res.Description,
+		},
+		Origin:      origin,
+		Revision:    res.Revision,
+		Fingerprint: fp,
+		Size:        res.Size,
+	}, nil
 }
 
 func (c *CharmStore) UploadResource(id *charm.URL, name, filename string) (revision int, err error) {
@@ -327,7 +344,7 @@ func (c *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 	}()
 	fp, err := resource.ParseFingerprint(data.Hash)
 	if err != nil {
-		return result, errgo.Mask(err, errgo.Any)
+		return result, errgo.NoteMask(err, "invalid fingerprint returned from server", errgo.Any)
 	}
 	return ResourceData{
 		ReadCloser:  data.ReadCloser,
@@ -420,4 +437,30 @@ func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	}
 	newRepo.client.SetHTTPHeader(header)
 	return &newRepo
+}
+
+type apiClient interface {
+	DisableStats()
+	Do(req *http.Request, path string) (*http.Response, error)
+	DoWithBody(req *http.Request, path string, body io.ReadSeeker) (*http.Response, error)
+	Get(path string, result interface{}) error
+	GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error)
+	GetResource(id *charm.URL, revision int, name string) (csclient.ResourceData, error)
+	ListResources(ids []*charm.URL) (map[string][]params.Resource, error)
+	Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.URL) error
+	Login() error
+	Meta(id *charm.URL, result interface{}) (*charm.URL, error)
+	Put(path string, val interface{}) error
+	PutCommonInfo(id *charm.URL, info map[string]interface{}) error
+	PutExtraInfo(id *charm.URL, info map[string]interface{}) error
+	PutWithResponse(path string, val, result interface{}) error
+	ServerURL() string
+	SetHTTPHeader(header http.Header)
+	StatsUpdate(req params.StatsUpdateRequest) error
+	UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error)
+	UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulgatedRevision int) error
+	UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error)
+	UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulgatedRevision int) error
+	UploadResource(id *charm.URL, name, path string, file io.ReadSeeker) (revision int, err error)
+	WhoAmI() (*params.WhoAmIResponse, error)
 }
