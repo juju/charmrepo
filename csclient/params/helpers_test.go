@@ -51,7 +51,7 @@ func (HelpersSuite) TestResource2API(c *gc.C) {
 	})
 }
 
-func (HelpersSuite) TestAPI2ResourceNoError(c *gc.C) {
+func (HelpersSuite) TestAPI2ResourceFull(c *gc.C) {
 	res, err := params.API2Resource(params.Resource{
 		Name:        "spam",
 		Type:        "file",
@@ -77,6 +77,33 @@ func (HelpersSuite) TestAPI2ResourceNoError(c *gc.C) {
 		Revision:    1,
 		Fingerprint: fp,
 		Size:        10,
+	}
+	err = expected.Validate()
+	c.Assert(err, jc.ErrorIsNil)
+
+	c.Check(res, jc.DeepEquals, expected)
+}
+
+func (HelpersSuite) TestAPI2ResourceBasic(c *gc.C) {
+	res, err := params.API2Resource(params.Resource{
+		Name:   "spam",
+		Type:   "file",
+		Path:   "spam.tgz",
+		Origin: "upload",
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	expected := resource.Resource{
+		Meta: resource.Meta{
+			Name:        "spam",
+			Type:        resource.TypeFile,
+			Path:        "spam.tgz",
+			Description: "",
+		},
+		Origin:      resource.OriginUpload,
+		Revision:    0,
+		Fingerprint: resource.Fingerprint{},
+		Size:        0,
 	}
 	err = expected.Validate()
 	c.Assert(err, jc.ErrorIsNil)
