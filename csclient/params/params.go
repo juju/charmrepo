@@ -260,6 +260,33 @@ type WhoAmIResponse struct {
 	Groups []string
 }
 
+// Resource describes a resource in the charm store.
+type Resource struct {
+	// Name identifies the resource.
+	Name string
+
+	// Type is the name of the resource type.
+	Type string
+
+	// Path is where the resource will be stored.
+	Path string
+
+	// Description contains user-facing info about the resource.
+	Description string `json:",omitempty"`
+
+	// Origin is where the resource will come from.
+	Origin string
+
+	// Revision is the revision, if applicable.
+	Revision int
+
+	// Fingerprint is the SHA-384 checksum for the resource blob.
+	Fingerprint []byte
+
+	// Size is the size of the resource, in bytes.
+	Size int64
+}
+
 const (
 	// BzrDigestKey is the extra-info key used to store the Bazaar digest
 	BzrDigestKey = "bzr-digest"
