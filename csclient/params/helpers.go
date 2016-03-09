@@ -4,6 +4,7 @@
 package params
 
 import (
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable/resource"
 )
 
@@ -28,17 +29,17 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 
 	rtype, err := resource.ParseType(apiInfo.Type)
 	if err != nil {
-		return res, err
+		return res, errgo.Mask(err, errgo.Any)
 	}
 
 	origin, err := resource.ParseOrigin(apiInfo.Origin)
 	if err != nil {
-		return res, err
+		return res, errgo.Mask(err, errgo.Any)
 	}
 
 	fp, err := deserializeFingerprint(apiInfo.Fingerprint)
 	if err != nil {
-		return res, err
+		return res, errgo.Mask(err, errgo.Any)
 	}
 
 	res = resource.Resource{
@@ -55,7 +56,7 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 	}
 
 	if err := res.Validate(); err != nil {
-		return res, err
+		return res, errgo.Mask(err, errgo.Any)
 	}
 	return res, nil
 }
@@ -66,5 +67,9 @@ func deserializeFingerprint(fpSum []byte) (resource.Fingerprint, error) {
 	if len(fpSum) == 0 {
 		return resource.Fingerprint{}, nil
 	}
-	return resource.NewFingerprint(fpSum)
+	fp, err := resource.NewFingerprint(fpSum)
+	if err != nil {
+		return fp, errgo.Mask(err, errgo.Any)
+	}
+	return fp, nil
 }
