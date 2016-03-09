@@ -51,7 +51,7 @@ func (HelpersSuite) TestResource2API(c *gc.C) {
 	})
 }
 
-func (HelpersSuite) TestAPI2Resource(c *gc.C) {
+func (HelpersSuite) TestAPI2ResourceNoError(c *gc.C) {
 	res, err := params.API2Resource(params.Resource{
 		Name:        "spam",
 		Type:        "file",
@@ -82,4 +82,60 @@ func (HelpersSuite) TestAPI2Resource(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 
 	c.Check(res, jc.DeepEquals, expected)
+}
+
+func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "<bogus>",
+		Path:        "spam.tgz",
+		Origin:      "upload",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `unsupported resource type "<bogus>"`)
+}
+
+func (HelpersSuite) TestAPI2ResourceBadOrigin(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "<bogus>",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `unknown origin "<bogus>"`)
+}
+
+func (HelpersSuite) TestAPI2ResourceBadFingerprint(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "upload",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint + "1"),
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `invalid fingerprint \(too big\)`)
+}
+
+func (HelpersSuite) TestAPI2ResourceValidateFailed(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "upload",
+		Revision:    1,
+		Fingerprint: []byte(fingerprint),
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `.*resource missing name`)
 }
