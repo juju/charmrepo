@@ -259,6 +259,11 @@ type PublishRequest struct {
 	// TODO(rog) remove this when we've updated the charmstore dependency
 	// to use the new PublishRequest type.
 	Published bool
+	// Resources defines the resource revisions to use for the charm.
+	// Each resource in the charm's metadata.yaml (if any) must have its
+	// name mapped to a revision. That revision must be one of the
+	// existing revisions for that resource.
+	Resources map[string]int `json:",omitempty"`
 }
 
 // PublishResponse holds the result of an id/publish PUT request.
@@ -273,6 +278,33 @@ type PublishResponse struct {
 type WhoAmIResponse struct {
 	User   string
 	Groups []string
+}
+
+// Resource describes a resource in the charm store.
+type Resource struct {
+	// Name identifies the resource.
+	Name string
+
+	// Type is the name of the resource type.
+	Type string
+
+	// Path is where the resource will be stored.
+	Path string
+
+	// Description contains user-facing info about the resource.
+	Description string `json:",omitempty"`
+
+	// Origin is where the resource will come from.
+	Origin string
+
+	// Revision is the revision, if applicable.
+	Revision int
+
+	// Fingerprint is the SHA-384 checksum for the resource blob.
+	Fingerprint []byte
+
+	// Size is the size of the resource, in bytes.
+	Size int64
 }
 
 const (
