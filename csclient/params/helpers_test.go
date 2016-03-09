@@ -111,6 +111,18 @@ func (HelpersSuite) TestAPI2ResourceBasic(c *gc.C) {
 	c.Check(res, jc.DeepEquals, expected)
 }
 
+func (HelpersSuite) TestAPI2ResourceNegativeRevision(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:     "spam",
+		Type:     "file",
+		Path:     "spam.tgz",
+		Origin:   "upload",
+		Revision: -1,
+	})
+
+	c.Check(err, gc.ErrorMatches, `invalid resource \(revision must be non-negative\)`)
+}
+
 func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
 	_, err := params.API2Resource(params.Resource{
 		Name:        "spam",
