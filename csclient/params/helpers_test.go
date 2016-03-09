@@ -126,6 +126,49 @@ func (HelpersSuite) TestAPI2ResourceBadFingerprint(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `invalid fingerprint \(too big\)`)
 }
 
+func (HelpersSuite) TestAPI2ResourceEmptyFingerprintNoSize(c *gc.C) {
+	res, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "upload",
+		Revision:    0,
+		Fingerprint: nil,
+		Size:        0,
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	expected := resource.Resource{
+		Meta: resource.Meta{
+			Name: "spam",
+			Type: resource.TypeFile,
+			Path: "spam.tgz",
+		},
+		Origin:      resource.OriginUpload,
+		Revision:    0,
+		Fingerprint: resource.Fingerprint{},
+		Size:        0,
+	}
+	err = expected.Validate()
+	c.Assert(err, jc.ErrorIsNil)
+
+	c.Check(res, jc.DeepEquals, expected)
+}
+
+func (HelpersSuite) TestAPI2ResourceEmptyFingerprintWithSize(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "upload",
+		Revision:    0,
+		Fingerprint: nil,
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `missing fingerprint`)
+}
+
 func (HelpersSuite) TestAPI2ResourceValidateFailed(c *gc.C) {
 	_, err := params.API2Resource(params.Resource{
 		Name:        "",
