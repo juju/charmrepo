@@ -273,6 +273,27 @@ type PublishResponse struct {
 	PromulgatedId *charm.URL `json:",omitempty"`
 }
 
+// PublishedResponse holds the result of an id/meta/published GET request.
+type PublishedResponse struct {
+	// Channels holds an entry for each channel that the
+	// entity has been published to.
+	Info []PublishedInfo
+}
+
+// PublishedInfo holds information on a channel that an entity
+// has been published to.
+type PublishedInfo struct {
+	// Channel holds the value of the channel that
+	// the entity has been published to.
+	// This will never be "unpublished" as entities
+	// cannot be published to that channel.
+	Channel Channel
+
+	// Current holds whether the entity is the most
+	// recently published member of the channel.
+	Current bool
+}
+
 // WhoAmIResponse holds the result of a whoami GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#whoami
 type WhoAmIResponse struct {
