@@ -291,6 +291,11 @@ type Resource struct {
 	Size int64
 }
 
+// ResourceUploadResponse holds the result of a post or a put to /id/resources/name.
+type ResourceUploadResponse struct {
+	Revision int
+}
+
 const (
 	// BzrDigestKey is the extra-info key used to store the Bazaar digest
 	BzrDigestKey = "bzr-digest"

@@ -36,12 +36,12 @@ func (ResourceSuite) TestListResources(c *gc.C) {
 			"cs:quantal/starsay": []params.Resource{
 				{
 					Name:        "data",
-					Type:        params.FileResource,
-					Origin:      params.OriginStore,
+					Type:        "file",
+					Origin:      "store",
 					Path:        "data.zip",
 					Description: "some zip file",
 					Revision:    1,
-					Fingerprint: fp.String(),
+					Fingerprint: fp.Bytes(),
 					Size:        int64(len(data)),
 				},
 			},

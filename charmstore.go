@@ -289,7 +289,7 @@ func apiResource2Resource(res params.Resource) (resource.Resource, error) {
 	if err != nil {
 		return result, errgo.Mask(err, errgo.Any)
 	}
-	fp, err := resource.ParseFingerprint(res.Fingerprint)
+	fp, err := resource.NewFingerprint(res.Fingerprint)
 	if err != nil {
 		return result, errgo.Mask(err, errgo.Any)
 	}
@@ -370,20 +370,20 @@ func (s *CharmStore) Publish(id *charm.URL, resources map[string]int) (*charm.UR
 	return result.Id, nil
 }
 
-func apiResourceType2ResourceType(t params.ResourceType) (resource.Type, error) {
+func apiResourceType2ResourceType(t string) (resource.Type, error) {
 	switch t {
-	case params.FileResource:
+	case "file":
 		return resource.TypeFile, nil
 	default:
 		return 0, errgo.Newf("unknown resource type: %v", t)
 	}
 }
 
-func apiOrigin2Origin(origin params.Origin) (resource.Origin, error) {
+func apiOrigin2Origin(origin string) (resource.Origin, error) {
 	switch origin {
-	case params.OriginStore:
+	case "store":
 		return resource.OriginStore, nil
-	case params.OriginUpload:
+	case "ulpoad":
 		return resource.OriginUpload, nil
 	default:
 		return 0, errgo.Newf("unknown origin: %v", origin)
