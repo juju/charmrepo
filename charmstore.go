@@ -51,10 +51,12 @@ type NewCharmStoreParams struct {
 	// If nil, a default function that returns an error will be used.
 	VisitWebPage func(url *url.URL) error
 
-	// User and Password hold the authentication credentials
-	// for the client. If User is empty, no credentials will be
-	// sent.
-	User     string
+	// User holds the name to authenticate as for the client. If User is empty,
+	// no credentials will be sent.
+	User string
+
+	// Password holds the password for the given user, for authenticating the
+	// client.
 	Password string
 }
 

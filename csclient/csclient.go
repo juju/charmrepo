@@ -50,10 +50,12 @@ type Params struct {
 	// If empty, the default charm store client location is used.
 	URL string
 
-	// User and Password hold the authentication credentials
-	// for the client. If User is empty, no credentials will be
-	// sent.
-	User     string
+	// User holds the name to authenticate as for the client. If User is empty,
+	// no credentials will be sent.
+	User string
+
+	// Password holds the password for the given user, for authenticating the
+	// client.
 	Password string
 
 	// HTTPClient holds the HTTP client to use when making
