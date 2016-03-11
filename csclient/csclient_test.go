@@ -298,22 +298,27 @@ func (s *suite) TestPutSuccess(c *gc.C) {
 }
 
 func (s *suite) TestPutWithResponseSuccess(c *gc.C) {
-	err := s.client.UploadCharmWithRevision(
-		charm.MustParseURL("~charmers/development/wily/wordpress-42"),
-		charmRepo.CharmDir("wordpress"),
-		42)
-	c.Assert(err, gc.IsNil)
-
-	publish := &params.PublishRequest{
-		Published: true,
+	// There are currently no endpoints that return a response
+	// on PUT, so we'll create a fake server just to test
+	// the PutWithResponse method.
+	handler := func(w http.ResponseWriter, req *http.Request) {
+		io.Copy(w, req.Body)
 	}
-	var result params.PublishResponse
-	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, &result)
+	srv := httptest.NewServer(http.HandlerFunc(handler))
+	defer srv.Close()
+	client := csclient.New(csclient.Params{
+		URL: srv.URL,
+	})
+
+	sendBody := "hello"
+
+	var result string
+	err := client.PutWithResponse("/somewhere", sendBody, &result)
 	c.Assert(err, gc.IsNil)
-	c.Assert(result.Id, jc.DeepEquals, charm.MustParseURL("~charmers/wily/wordpress-42"))
+	c.Assert(result, gc.Equals, sendBody)
 
 	// Check that the method accepts a nil result.
-	err = s.client.PutWithResponse("/~charmers/wily/wordpress-42/publish", publish, nil)
+	err = client.PutWithResponse("/somewhere", sendBody, nil)
 	c.Assert(err, gc.IsNil)
 }
 
@@ -990,6 +995,32 @@ func (s *suite) TestDo(c *gc.C) {
 	data, err := ioutil.ReadAll(resp.Body)
 	c.Assert(err, gc.IsNil)
 	c.Assert(string(data), gc.Equals, `"bar"`)
+}
+
+func (s *suite) TestWithChannel(c *gc.C) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, req *http.Request) {
+		fmt.Fprint(w, req.URL.Query().Encode())
+	}))
+	client := csclient.New(csclient.Params{
+		URL: srv.URL,
+	})
+
+	makeRequest := func(client *csclient.Client) string {
+		req, err := http.NewRequest("GET", "", nil)
+		c.Assert(err, jc.ErrorIsNil)
+		resp, err := client.DoWithBody(req, "/", nil)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
+		b, err := ioutil.ReadAll(resp.Body)
+		c.Assert(err, jc.ErrorIsNil)
+		return string(b)
+	}
+
+	c.Assert(makeRequest(client), gc.Equals, "")
+	devClient := client.WithChannel(params.DevelopmentChannel)
+	c.Assert(makeRequest(devClient), gc.Equals, "channel=development")
+	// Ensure the original client has not been mutated.
+	c.Assert(makeRequest(client), gc.Equals, "")
 }
 
 var metaBadTypeTests = []struct {

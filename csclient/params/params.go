@@ -35,6 +35,23 @@ const (
 	Admin    = "admin"
 )
 
+// Channel is the name of a channel in which an entity may be published.
+type Channel string
+
+const (
+	// DevelopmentChannel is the channel used for charms or bundles under development.
+	DevelopmentChannel Channel = "development"
+
+	// StableChannel is the channel used for stable charms or bundles.
+	StableChannel Channel = "stable"
+
+	// UnpublishedChannel is the default channel to which charms are uploaded.
+	UnpublishedChannel Channel = "unpublished"
+
+	// NoChannel represents where no channel has been specifically requested.
+	NoChannel Channel = ""
+)
+
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
 type MetaAnyResponse EntityResult
@@ -242,6 +259,9 @@ type PromulgateRequest struct {
 // PublishRequest holds the request of an id/publish PUT request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
 type PublishRequest struct {
+	Channels []Channel
+	// TODO(rog) remove this when we've updated the charmstore dependency
+	// to use the new PublishRequest type.
 	Published bool
 	// Resources defines the resource revisions to use for the charm.
 	// Each resource in the charm's metadata.yaml (if any) must have its
@@ -255,6 +275,27 @@ type PublishRequest struct {
 type PublishResponse struct {
 	Id            *charm.URL
 	PromulgatedId *charm.URL `json:",omitempty"`
+}
+
+// PublishedResponse holds the result of an id/meta/published GET request.
+type PublishedResponse struct {
+	// Channels holds an entry for each channel that the
+	// entity has been published to.
+	Info []PublishedInfo
+}
+
+// PublishedInfo holds information on a channel that an entity
+// has been published to.
+type PublishedInfo struct {
+	// Channel holds the value of the channel that
+	// the entity has been published to.
+	// This will never be "unpublished" as entities
+	// cannot be published to that channel.
+	Channel Channel
+
+	// Current holds whether the entity is the most
+	// recently published member of the channel.
+	Current bool
 }
 
 // WhoAmIResponse holds the result of a whoami GET request.
