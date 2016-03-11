@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -36,7 +37,7 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 // Client represents the client side of a charm store.
 type Client struct {
 	params        Params
-	bclient       *httpbakery.Client
+	bclient       httpClient
 	header        http.Header
 	statsDisabled bool
 }
@@ -49,10 +50,12 @@ type Params struct {
 	// If empty, the default charm store client location is used.
 	URL string
 
-	// User and Password hold the authentication credentials
-	// for the client. If User is empty, no credentials will be
-	// sent.
-	User     string
+	// User holds the name to authenticate as for the client. If User is empty,
+	// no credentials will be sent.
+	User string
+
+	// Password holds the password for the given user, for authenticating the
+	// client.
 	Password string
 
 	// HTTPClient holds the HTTP client to use when making
@@ -64,6 +67,10 @@ type Params struct {
 	// the user visits a web page to authenticate themselves.
 	// If nil, no interaction will be allowed.
 	VisitWebPage func(url *url.URL) error
+}
+
+type httpClient interface {
+	DoWithBody(*http.Request, io.ReadSeeker) (*http.Response, error)
 }
 
 // New returns a new charm store client.
@@ -154,6 +161,125 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 		return nil, nil, "", 0, errgo.Newf("no content length found in response")
 	}
 	return resp.Body, eid, hash, resp.ContentLength, nil
+}
+
+// ListResources retrieves the metadata about resources for the given charm.
+func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
+	// Prepare the request to the charm store.
+	urls := make([]string, len(ids))
+	values := url.Values{}
+	for i, id := range ids {
+		url := id.WithRevision(-1).String()
+		urls[i] = url
+		values.Add("id", url)
+	}
+	u := url.URL{
+		Path:     "/meta/resources",
+		RawQuery: values.Encode(),
+	}
+
+	// Execute the request and retrieve results.
+	var results map[string][]params.Resource
+
+	if err := c.Get(u.String(), &results); err != nil {
+		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
+	}
+
+	return results, nil
+}
+
+// UploadResource uploads the bytes for a resource.
+func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSeeker) (revision int, err error) {
+	hash, size, err := readerHashAndSize(file)
+	if err != nil {
+		return -1, errgo.Mask(err)
+	}
+
+	// Prepare the request.
+	req, err := http.NewRequest("PUT", "", nil)
+	if err != nil {
+		return -1, errgo.Notef(err, "cannot make new request")
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = size
+
+	hash = url.QueryEscape(hash)
+	path = url.QueryEscape(path)
+
+	url := fmt.Sprintf("/%s/resources/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
+
+	// Send the request.
+	resp, err := c.DoWithBody(req, url, file)
+	if err != nil {
+		return -1, errgo.NoteMask(err, "cannot post resource", errgo.Any)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response.
+	var result params.ResourceUploadResponse
+	if err := parseResponseBody(resp.Body, &result); err != nil {
+		return -1, errgo.Mask(err)
+	}
+	return result.Revision, nil
+}
+
+// ResourceData
+type ResourceData struct {
+	io.ReadCloser
+	Revision int
+	Hash     string
+	Size     int64
+}
+
+// GetResource retrieves byes of the resource with the given name and revision
+// for the given charm, returning a reader its data can be read from,  the
+// SHA384 hash of the data and its size.  If revision is -1, the latest revision
+// of the resource will be retrieved.
+func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
+	// Create the request.
+	req, err := http.NewRequest("GET", "", nil)
+	if err != nil {
+		return result, errgo.Notef(err, "cannot make new request")
+	}
+
+	url := "/" + id.Path() + "/resource/" + name
+	if revision >= 0 {
+		url += "/" + strconv.Itoa(revision)
+	}
+	resp, err := c.Do(req, url)
+	if err != nil {
+		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)
+	}
+	defer func() {
+		if err != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	// Validate the response headers.
+	revisionStr := resp.Header.Get(params.ResourceRevisionHeader)
+	if revisionStr == "" {
+		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
+	}
+	revision, err = strconv.Atoi(revisionStr)
+	if err != nil {
+		return result, errgo.Notef(err, "invalid resource revision found in response")
+	}
+	hash := resp.Header.Get(params.ContentHashHeader)
+	if hash == "" {
+		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
+	}
+
+	// Validate the response contents.
+	if resp.ContentLength < 0 {
+		return result, errgo.Newf("no content length found in response")
+	}
+	return ResourceData{
+		ReadCloser: resp.Body,
+		Revision:   revision,
+		Hash:       hash,
+		Size:       resp.ContentLength,
+	}, nil
 }
 
 // StatsUpdate updates the download stats for the given id and specific time.

@@ -23,6 +23,10 @@ const (
 	// EntityIdHeader specifies the header attribute that will hold the
 	// id of the entity for archive GET responses.
 	EntityIdHeader = "Entity-Id"
+
+	// ResourceRevisionHeader specifies the header attribute that will hold the
+	// revision of the resource retrieved by a resource GET request.
+	ResourceRevisionHeader = "Resource-Revision"
 )
 
 // Special user/group names.
@@ -285,6 +289,11 @@ type Resource struct {
 
 	// Size is the size of the resource, in bytes.
 	Size int64
+}
+
+// ResourceUploadResponse holds the result of a post or a put to /id/resources/name.
+type ResourceUploadResponse struct {
+	Revision int
 }
 
 const (
