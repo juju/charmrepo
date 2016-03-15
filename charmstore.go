@@ -362,7 +362,7 @@ func (s *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 // Publish tells the charmstore to mark the given charm as published with the
 // given resource revisions to the given channels. If no channels are specified,
 // the stable channel will be assumed.
-func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[string]int) (*charm.URL, error) {
+func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[string]int) error {
 	chans := make([]params.Channel, len(channels))
 	if len(channels) == 0 {
 		chans = []params.Channel{params.StableChannel}
@@ -374,11 +374,10 @@ func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[str
 		Resources: resources,
 		Channels:  chans,
 	}
-	var result params.PublishResponse
-	if err := s.client.PutWithResponse("/"+id.Path()+"/publish", val, &result); err != nil {
-		return nil, errgo.Mask(err)
+	if err := s.client.Put("/"+id.Path()+"/publish", val); err != nil {
+		return errgo.Mask(err)
 	}
-	return result.Id, nil
+	return nil
 }
 
 func apiResourceType2ResourceType(t string) (resource.Type, error) {
