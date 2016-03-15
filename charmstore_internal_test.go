@@ -177,11 +177,12 @@ func (ResourceSuite) TestPublish(c *gc.C) {
 		"data": 1,
 		"lib":  2,
 	}
-	result, err := s.Publish(id, resources)
+	result, err := s.Publish(id, []string{"development"}, resources)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, gc.DeepEquals, idrev)
 	f.CheckCall(c, 0, "PutWithResponse", "/"+id.Path()+"/publish", &params.PublishRequest{
 		Resources: resources,
+		Channels:  []params.Channel{params.DevelopmentChannel},
 	})
 }
 
