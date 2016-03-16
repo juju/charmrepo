@@ -17,6 +17,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
@@ -41,6 +42,11 @@ type NewCharmStoreParams struct {
 	// If empty, the default charm store client location is used.
 	URL string
 
+	// BakeryClient holds the bakery client to use when making
+	// requests to the store. This is used in preference to
+	// HTTPClient.
+	BakeryClient *httpbakery.Client
+
 	// HTTPClient holds the HTTP client to use when making
 	// requests to the store. If nil, httpbakery.NewHTTPClient will
 	// be used.
@@ -48,7 +54,8 @@ type NewCharmStoreParams struct {
 
 	// VisitWebPage is called when authorization requires that
 	// the user visits a web page to authenticate themselves.
-	// If nil, a default function that returns an error will be used.
+	// If nil, no interaction will be allowed. This field
+	// is ignored if BakeryClient is provided.
 	VisitWebPage func(url *url.URL) error
 
 	// User holds the name to authenticate as for the client. If User is empty,
@@ -69,6 +76,7 @@ type NewCharmStoreParams struct {
 func NewCharmStore(p NewCharmStoreParams) *CharmStore {
 	client := csclient.New(csclient.Params{
 		URL:          p.URL,
+		BakeryClient: p.BakeryClient,
 		HTTPClient:   p.HTTPClient,
 		VisitWebPage: p.VisitWebPage,
 		User:         p.User,

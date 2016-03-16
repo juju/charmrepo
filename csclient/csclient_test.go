@@ -28,6 +28,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
@@ -64,6 +65,37 @@ func (s *suite) SetUpTest(c *gc.C) {
 		User:     s.serverParams.AuthUsername,
 		Password: s.serverParams.AuthPassword,
 	})
+}
+
+func (s *suite) TestNewWithBakeryClient(c *gc.C) {
+	// Make a csclient.Client with a custom bakery client that
+	// enables us to tell if that's really being used.
+	bclient := httpbakery.NewClient()
+	acquired := false
+	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+		acquired = true
+		return bclient.AcquireDischarge(firstPartyLocation, cav)
+	})
+	client := csclient.New(csclient.Params{
+		URL:          s.srv.URL,
+		BakeryClient: bclient,
+	})
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
+	}
+	err := client.UploadCharmWithRevision(
+		charm.MustParseURL("~bob/precise/wordpress-0"),
+		charmRepo.CharmDir("wordpress"),
+		42,
+	)
+	c.Assert(err, gc.IsNil)
+	c.Assert(acquired, gc.Equals, true)
+}
+
+type dischargeAcquirerFunc func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error)
+
+func (f dischargeAcquirerFunc) AcquireDischarge(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+	return f(firstPartyLocation, cav)
 }
 
 func (s *suite) TearDownTest(c *gc.C) {

@@ -59,6 +59,11 @@ type Params struct {
 	// client.
 	Password string
 
+	// BakeryClient holds the bakery client to use when making
+	// requests to the store. This is used in preference to
+	// HTTPClient.
+	BakeryClient *httpbakery.Client
+
 	// HTTPClient holds the HTTP client to use when making
 	// requests to the store. If nil, httpbakery.NewHTTPClient will
 	// be used.
@@ -66,7 +71,8 @@ type Params struct {
 
 	// VisitWebPage is called when authorization requires that
 	// the user visits a web page to authenticate themselves.
-	// If nil, no interaction will be allowed.
+	// If nil, no interaction will be allowed. This field
+	// is ignored if BakeryClient is provided.
 	VisitWebPage func(url *url.URL) error
 }
 
@@ -79,15 +85,19 @@ func New(p Params) *Client {
 	if p.URL == "" {
 		p.URL = ServerURL
 	}
-	if p.HTTPClient == nil {
-		p.HTTPClient = httpbakery.NewHTTPClient()
-	}
-	return &Client{
-		params: p,
-		bclient: &httpbakery.Client{
+	bclient := p.BakeryClient
+	if bclient == nil {
+		if p.HTTPClient == nil {
+			p.HTTPClient = httpbakery.NewHTTPClient()
+		}
+		bclient = &httpbakery.Client{
 			Client:       p.HTTPClient,
 			VisitWebPage: p.VisitWebPage,
-		},
+		}
+	}
+	return &Client{
+		bclient: bclient,
+		params:  p,
 	}
 }
 
