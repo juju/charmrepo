@@ -360,13 +360,12 @@ func (s *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 }
 
 // Publish tells the charmstore to mark the given charm as published with the
-// given resource revisions to the given channels. If no channels are specified,
-// the stable channel will be assumed.
+// given resource revisions to the given channels.
 func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[string]int) error {
-	chans := make([]params.Channel, len(channels))
 	if len(channels) == 0 {
-		chans = []params.Channel{params.StableChannel}
+		return errgo.New("no channel specified")
 	}
+	chans := make([]params.Channel, len(channels))
 	for i, ch := range channels {
 		chans[i] = params.Channel(ch)
 	}
