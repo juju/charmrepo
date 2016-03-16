@@ -367,16 +367,24 @@ func (s *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 	}, nil
 }
 
-// Publish tells the charmstore to mark the given charm as published with the given resource revisions.
-func (s *CharmStore) Publish(id *charm.URL, resources map[string]int) (*charm.URL, error) {
+// Publish tells the charmstore to mark the given charm as published with the
+// given resource revisions to the given channels.
+func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[string]int) error {
+	if len(channels) == 0 {
+		return errgo.New("no channel specified")
+	}
+	chans := make([]params.Channel, len(channels))
+	for i, ch := range channels {
+		chans[i] = params.Channel(ch)
+	}
 	val := &params.PublishRequest{
 		Resources: resources,
+		Channels:  chans,
 	}
-	var result params.PublishResponse
-	if err := s.client.PutWithResponse("/"+id.Path()+"/publish", val, &result); err != nil {
-		return nil, errgo.Mask(err)
+	if err := s.client.Put("/"+id.Path()+"/publish", val); err != nil {
+		return errgo.Mask(err)
 	}
-	return result.Id, nil
+	return nil
 }
 
 func apiResourceType2ResourceType(t string) (resource.Type, error) {

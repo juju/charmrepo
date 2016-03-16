@@ -177,11 +177,11 @@ func (ResourceSuite) TestPublish(c *gc.C) {
 		"data": 1,
 		"lib":  2,
 	}
-	result, err := s.Publish(id, resources)
+	err := s.Publish(id, []string{"development"}, resources)
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(result, gc.DeepEquals, idrev)
-	f.CheckCall(c, 0, "PutWithResponse", "/"+id.Path()+"/publish", &params.PublishRequest{
+	f.CheckCall(c, 0, "Put", "/"+id.Path()+"/publish", &params.PublishRequest{
 		Resources: resources,
+		Channels:  []params.Channel{params.DevelopmentChannel},
 	})
 }
 
@@ -211,10 +211,8 @@ func (f *fakeClient) GetResource(id *charm.URL, revision int, name string) (cscl
 	return f.ReturnGetResource, f.NextErr()
 }
 
-func (f *fakeClient) PutWithResponse(path string, val, result interface{}) error {
-	f.AddCall("PutWithResponse", path, val)
-	res := result.(*params.PublishResponse)
-	*res = f.ReturnPutWithResponse
+func (f *fakeClient) Put(path string, val interface{}) error {
+	f.AddCall("Put", path, val)
 	return f.NextErr()
 }
 
