@@ -181,7 +181,6 @@ func (ResourceSuite) TestPublish(c *gc.C) {
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(result, gc.DeepEquals, idrev)
 	f.CheckCall(c, 0, "PutWithResponse", "/"+id.Path()+"/publish", &params.PublishRequest{
-		Published: true,
 		Resources: resources,
 	})
 }
