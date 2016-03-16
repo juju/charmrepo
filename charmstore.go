@@ -16,7 +16,6 @@ import (
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
@@ -29,7 +28,7 @@ var CacheDir string
 // CharmStore is a repository Interface that provides access to the public Juju
 // charm store.
 type CharmStore struct {
-	client apiClient
+	client *csclient.Client
 }
 
 var _ Interface = (*CharmStore)(nil)
@@ -91,6 +90,12 @@ func NewCharmStoreFromClient(client *csclient.Client) *CharmStore {
 	return &CharmStore{
 		client: client,
 	}
+}
+
+// Client returns the charmstore client that the CharmStore
+// implementation uses under the hood.
+func (s *CharmStore) Client() *csclient.Client {
+	return s.client
 }
 
 // Get implements Interface.Get.
@@ -258,155 +263,6 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 	return responses, nil
 }
 
-// ListResources returns metadata for all the resources defined on the given charms.
-func (s *CharmStore) ListResources(ids []*charm.URL) ([]ResourceResult, error) {
-	if len(ids) == 0 {
-		return nil, nil
-	}
-
-	results, err := s.client.ListResources(ids)
-	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
-	}
-
-	result := make([]ResourceResult, len(ids))
-	for i, id := range ids {
-		resources, ok := results[id.String()]
-		if !ok {
-			result[i].Err = CharmNotFound(id.String())
-			continue
-		}
-		list := make([]resource.Resource, len(resources))
-		for j, res := range resources {
-			resource, err := apiResource2Resource(res)
-			if err != nil {
-				return nil, errgo.Notef(err, "got bad data from server for resource %q", res.Name)
-			}
-			list[j] = resource
-		}
-		result[i].Resources = list
-	}
-	return result, nil
-}
-
-func apiResource2Resource(res params.Resource) (resource.Resource, error) {
-	var result resource.Resource
-	resType, err := apiResourceType2ResourceType(res.Type)
-	if err != nil {
-		return result, errgo.Mask(err, errgo.Any)
-	}
-	origin, err := apiOrigin2Origin(res.Origin)
-	if err != nil {
-		return result, errgo.Mask(err, errgo.Any)
-	}
-	fp, err := resource.NewFingerprint(res.Fingerprint)
-	if err != nil {
-		return result, errgo.Mask(err, errgo.Any)
-	}
-	return resource.Resource{
-		Meta: resource.Meta{
-			Name:        res.Name,
-			Type:        resType,
-			Path:        res.Path,
-			Description: res.Description,
-		},
-		Origin:      origin,
-		Revision:    res.Revision,
-		Fingerprint: fp,
-		Size:        res.Size,
-	}, nil
-}
-
-// UploadResource uploads the bytes from the given file as a resource with the given name for the charm.
-func (s *CharmStore) UploadResource(id *charm.URL, name, filename string) (revision int, err error) {
-	f, err := os.Open(filename)
-	if err != nil {
-		return -1, errgo.Mask(err, errgo.Any)
-	}
-	defer f.Close()
-	rev, err := s.client.UploadResource(id, name, filename, f)
-	if err != nil {
-		return rev, errgo.Mask(err, errgo.Any)
-	}
-	return rev, nil
-}
-
-// ResourceData holds the information about the bytes of a resource.
-type ResourceData struct {
-	io.ReadCloser
-	Size        int64
-	Revision    int
-	Fingerprint resource.Fingerprint
-}
-
-// GetLatestResource returns the bytes for the latest revision of the given resource.
-func (s *CharmStore) GetLatestResource(id *charm.URL, name string) (result ResourceData, err error) {
-	return s.GetResource(id, -1, name)
-}
-
-// GetResource returns the bytes for the specified revision of the given resource.
-func (s *CharmStore) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
-	data, err := s.client.GetResource(id, revision, name)
-	if err != nil {
-		return result, errgo.Mask(err, errgo.Any)
-	}
-	defer func() {
-		if err != nil {
-			data.Close()
-		}
-	}()
-	fp, err := resource.ParseFingerprint(data.Hash)
-	if err != nil {
-		return result, errgo.NoteMask(err, "invalid fingerprint returned from server", errgo.Any)
-	}
-	return ResourceData{
-		ReadCloser:  data.ReadCloser,
-		Size:        data.Size,
-		Revision:    data.Revision,
-		Fingerprint: fp,
-	}, nil
-}
-
-// Publish tells the charmstore to mark the given charm as published with the
-// given resource revisions to the given channels.
-func (s *CharmStore) Publish(id *charm.URL, channels []string, resources map[string]int) error {
-	if len(channels) == 0 {
-		return errgo.New("no channel specified")
-	}
-	chans := make([]params.Channel, len(channels))
-	for i, ch := range channels {
-		chans[i] = params.Channel(ch)
-	}
-	val := &params.PublishRequest{
-		Resources: resources,
-		Channels:  chans,
-	}
-	if err := s.client.Put("/"+id.Path()+"/publish", val); err != nil {
-		return errgo.Mask(err)
-	}
-	return nil
-}
-
-func apiResourceType2ResourceType(t string) (resource.Type, error) {
-	switch t {
-	case "file":
-		return resource.TypeFile, nil
-	default:
-		return 0, errgo.Newf("unknown resource type: %v", t)
-	}
-}
-
-func apiOrigin2Origin(origin string) (resource.Origin, error) {
-	switch origin {
-	case "store":
-		return resource.OriginStore, nil
-	case "ulpoad":
-		return resource.OriginUpload, nil
-	default:
-		return 0, errgo.Newf("unknown origin: %v", origin)
-	}
-}
-
 // Resolve implements Interface.Resolve.
 func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	var result struct {
@@ -458,30 +314,4 @@ func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	}
 	newRepo.client.SetHTTPHeader(header)
 	return &newRepo
-}
-
-type apiClient interface {
-	DisableStats()
-	Do(req *http.Request, path string) (*http.Response, error)
-	DoWithBody(req *http.Request, path string, body io.ReadSeeker) (*http.Response, error)
-	Get(path string, result interface{}) error
-	GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error)
-	GetResource(id *charm.URL, revision int, name string) (csclient.ResourceData, error)
-	ListResources(ids []*charm.URL) (map[string][]params.Resource, error)
-	Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.URL) error
-	Login() error
-	Meta(id *charm.URL, result interface{}) (*charm.URL, error)
-	Put(path string, val interface{}) error
-	PutCommonInfo(id *charm.URL, info map[string]interface{}) error
-	PutExtraInfo(id *charm.URL, info map[string]interface{}) error
-	PutWithResponse(path string, val, result interface{}) error
-	ServerURL() string
-	SetHTTPHeader(header http.Header)
-	StatsUpdate(req params.StatsUpdateRequest) error
-	UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error)
-	UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulgatedRevision int) error
-	UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error)
-	UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulgatedRevision int) error
-	UploadResource(id *charm.URL, name, path string, file io.ReadSeeker) (revision int, err error)
-	WhoAmI() (*params.WhoAmIResponse, error)
 }
