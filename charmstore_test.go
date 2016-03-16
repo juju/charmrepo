@@ -202,37 +202,6 @@ func (s *charmStoreRepoSuite) TestNewCharmStoreFromClient(c *gc.C) {
 	c.Check(repo.URL(), gc.Equals, csclient.ServerURL)
 }
 
-func (s *charmStoreRepoSuite) TestPublish(c *gc.C) {
-	id := charm.MustParseURL("cs:~who/trusty/mysql")
-	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
-
-	// Upload the charm.
-	url, err := s.client.UploadCharm(id, ch)
-	c.Assert(err, gc.IsNil)
-
-	// have to make a new repo from the client, since the embedded repo is not
-	// authenticated.
-	repo := charmrepo.NewCharmStoreFromClient(s.client)
-	err = repo.Publish(url, []string{"development"}, nil)
-	c.Assert(err, jc.ErrorIsNil)
-	client := s.client.WithChannel(params.DevelopmentChannel)
-	repo = charmrepo.NewCharmStoreFromClient(client)
-	_, err = repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-
-	client = s.client.WithChannel(params.StableChannel)
-	repo = charmrepo.NewCharmStoreFromClient(client)
-	_, err = repo.Get(url)
-	c.Assert(err, gc.ErrorMatches, ".*charm not found")
-
-}
-
-func (s *charmStoreRepoSuite) TestPublishNoChannel(c *gc.C) {
-	id := charm.MustParseURL("cs:~who/trusty/mysql")
-	err := s.repo.Publish(id, nil, nil)
-	c.Assert(err, gc.ErrorMatches, "no channel specified")
-}
-
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
 	expect, url := s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
 	ch, err := s.repo.Get(url)

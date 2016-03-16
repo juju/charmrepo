@@ -1473,6 +1473,34 @@ func (s *suite) TestWhoAmI(c *gc.C) {
 	c.Assert(response.User, gc.Equals, "bob")
 }
 
+func (s *suite) TestPublish(c *gc.C) {
+	id := charm.MustParseURL("cs:~who/trusty/mysql")
+	ch := charmRepo.CharmArchive(c.MkDir(), "mysql")
+
+	// Upload the charm.
+	url, err := s.client.UploadCharm(id, ch)
+	c.Assert(err, gc.IsNil)
+
+	// have to make a new repo from the client, since the embedded repo is not
+	// authenticated.
+	err = s.client.Publish(url, []params.Channel{params.DevelopmentChannel}, nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	client := s.client.WithChannel(params.DevelopmentChannel)
+	err = client.Get("/"+url.Path()+"/meta/id", nil)
+	c.Assert(err, jc.ErrorIsNil)
+
+	client = s.client.WithChannel(params.StableChannel)
+	err = client.Get("/"+url.Path()+"/meta/id", nil)
+	c.Assert(err, gc.ErrorMatches, ".*not found in stable channel")
+}
+
+func (s *suite) TestPublishNoChannel(c *gc.C) {
+	id := charm.MustParseURL("cs:~who/trusty/mysql")
+	err := s.client.Publish(id, nil, nil)
+	c.Assert(err, jc.ErrorIsNil)
+}
+
 func (s *suite) setPublic(c *gc.C, id *charm.URL) {
 	// Publish to stable.
 	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{

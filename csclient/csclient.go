@@ -184,26 +184,21 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 
 // ListResources retrieves the metadata about resources for the given charm.
 func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
-	// Prepare the request to the charm store.
+	// Prepare the request.
 	urls := make([]string, len(ids))
-	values := url.Values{}
 	for i, id := range ids {
-		url := id.WithRevision(-1).String()
-		urls[i] = url
-		values.Add("id", url)
+		urls[i] = id.WithRevision(-1).String()
 	}
-	u := url.URL{
-		Path:     "/meta/resources",
-		RawQuery: values.Encode(),
+	values := url.Values{
+		"id": urls,
 	}
+	path := "/meta/resources?" + values.Encode()
 
-	// Execute the request and retrieve results.
+	// Send the request.
 	var results map[string][]params.Resource
-
-	if err := c.Get(u.String(), &results); err != nil {
+	if err := c.Get(path, &results); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
-
 	return results, nil
 }
 
@@ -242,7 +237,24 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSe
 	return result.Revision, nil
 }
 
-// ResourceData
+// Publish tells the charmstore to mark the given charm as published with the
+// given resource revisions to the given channels.
+func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map[string]int) error {
+	if len(channels) == 0 {
+		return nil
+	}
+	val := &params.PublishRequest{
+		Resources: resources,
+		Channels:  channels,
+	}
+	if err := s.Put("/"+id.Path()+"/publish", val); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// ResourceData holds information about a resource.
+// It must be closed after use.
 type ResourceData struct {
 	io.ReadCloser
 	Revision int
@@ -254,6 +266,8 @@ type ResourceData struct {
 // for the given charm, returning a reader its data can be read from,  the
 // SHA384 hash of the data and its size.  If revision is -1, the latest revision
 // of the resource will be retrieved.
+//
+// Note that the result must be closed after use.
 func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
