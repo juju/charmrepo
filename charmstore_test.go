@@ -106,10 +106,7 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
-
+	s.setPublic(c, id)
 	return ch, id
 }
 
@@ -126,9 +123,7 @@ func (s *charmStoreBaseSuite) addCharmNoRevision(c *gc.C, urlStr, name string) (
 	url, err := s.client.UploadCharm(id, ch)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+url.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	s.setPublic(c, id)
 
 	return ch, url
 }
@@ -148,12 +143,22 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	err := s.client.UploadBundleWithRevision(id, b, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	s.setPublic(c, id)
 
 	// Return the bundle and its URL.
 	return b, id
+}
+
+func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL) {
+	// Publish to stable.
+	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+		Channels: []params.Channel{params.StableChannel},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 type charmStoreRepoSuite struct {
@@ -527,11 +532,15 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 
 func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Add some charms to the charm store.
+
+	// Add promulgated entities first so that the base entity
+	// is marked as promulgated when it first gets inserted.
+	s.addCharm(c, "utopic/mysql-47", "mysql")
+	s.addCharmNoRevision(c, "multi-series", "multi-series")
+
 	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
 	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
-	s.addCharmNoRevision(c, "multi-series", "multi-series")
-	s.addCharm(c, "utopic/mysql-47", "mysql")
 
 	// Define the tests to be run.
 	tests := []struct {

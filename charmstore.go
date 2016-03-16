@@ -362,7 +362,6 @@ func (s *CharmStore) GetResource(id *charm.URL, revision int, name string) (resu
 // Publish tells the charmstore to mark the given charm as published with the given resource revisions.
 func (s *CharmStore) Publish(id *charm.URL, resources map[string]int) (*charm.URL, error) {
 	val := &params.PublishRequest{
-		Published: true,
 		Resources: resources,
 	}
 	var result params.PublishResponse

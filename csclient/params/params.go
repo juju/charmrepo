@@ -260,9 +260,6 @@ type PromulgateRequest struct {
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
 type PublishRequest struct {
 	Channels []Channel
-	// TODO(rog) remove this when we've updated the charmstore dependency
-	// to use the new PublishRequest type.
-	Published bool
 	// Resources defines the resource revisions to use for the charm.
 	// Each resource in the charm's metadata.yaml (if any) must have its
 	// name mapped to a revision. That revision must be one of the

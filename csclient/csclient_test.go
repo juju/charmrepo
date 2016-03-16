@@ -99,12 +99,14 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 
 func (s *suite) TestDefaultServerURL(c *gc.C) {
 	// Add a charm used for tests.
+	url := charm.MustParseURL("~charmers/vivid/testing-wordpress-42")
 	err := s.client.UploadCharmWithRevision(
-		charm.MustParseURL("~charmers/vivid/testing-wordpress-42"),
+		url,
 		charmRepo.CharmDir("wordpress"),
 		42,
 	)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	// Patch the default server URL.
 	s.PatchValue(&csclient.ServerURL, s.srv.URL)
@@ -196,6 +198,7 @@ func (s *suite) TestGet(c *gc.C) {
 	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
 	err := s.client.UploadCharmWithRevision(url, ch, 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	for i, test := range getTests {
 		c.Logf("test %d: %s", i, test.about)
@@ -254,11 +257,10 @@ var putErrorTests = []struct {
 }}
 
 func (s *suite) TestPutError(c *gc.C) {
-	err := s.client.UploadCharmWithRevision(
-		charm.MustParseURL("~charmers/utopic/wordpress-42"),
-		charmRepo.CharmDir("wordpress"),
-		42)
+	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
+	err := s.client.UploadCharmWithRevision(url, charmRepo.CharmDir("wordpress"), 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	checkErr := func(err error, expectError string, expectErrorCode params.ErrorCode) {
 		c.Assert(err, gc.ErrorMatches, expectError)
@@ -282,11 +284,10 @@ func (s *suite) TestPutError(c *gc.C) {
 }
 
 func (s *suite) TestPutSuccess(c *gc.C) {
-	err := s.client.UploadCharmWithRevision(
-		charm.MustParseURL("~charmers/utopic/wordpress-42"),
-		charmRepo.CharmDir("wordpress"),
-		42)
+	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
+	err := s.client.UploadCharmWithRevision(url, charmRepo.CharmDir("wordpress"), 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	perms := []string{"bob"}
 	err = s.client.Put("/~charmers/utopic/wordpress-42/meta/perm/read", perms)
@@ -398,6 +399,7 @@ func (s *suite) checkGetArchive(c *gc.C) string {
 	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
 	err := s.client.UploadCharmWithRevision(url, ch, 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	rb, id, hash, size, err := s.client.GetArchive(url)
 	c.Assert(err, gc.IsNil)
@@ -420,7 +422,7 @@ func (s *suite) checkGetArchive(c *gc.C) string {
 func (s *suite) TestGetArchiveErrorNotFound(c *gc.C) {
 	url := charm.MustParseURL("no-such")
 	r, id, hash, size, err := s.client.GetArchive(url)
-	c.Assert(err, gc.ErrorMatches, `cannot get archive: no matching charm or bundle for "cs:no-such"`)
+	c.Assert(err, gc.ErrorMatches, `cannot get archive: no matching charm or bundle for cs:no-such`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(r, gc.IsNil)
 	c.Assert(id, gc.IsNil)
@@ -550,12 +552,14 @@ func (s *suite) prepareBundleCharms(c *gc.C) {
 		42,
 	)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, charm.MustParseURL("~charmers/utopic/wordpress-42"))
 	err = s.client.UploadCharmWithRevision(
 		charm.MustParseURL("~charmers/utopic/mysql-47"),
 		charmRepo.CharmArchive(c.MkDir(), "mysql"),
 		47,
 	)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, charm.MustParseURL("~charmers/utopic/mysql-47"))
 }
 
 func (s *suite) TestUploadArchiveWithBundle(c *gc.C) {
@@ -670,6 +674,7 @@ func (s *suite) TestUploadCharmArchiveWithRevision(c *gc.C) {
 		10,
 	)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, id)
 	ch := charmRepo.CharmArchive(c.MkDir(), "wordpress")
 	s.checkUploadCharm(c, id, ch)
 	id.User = ""
@@ -818,15 +823,15 @@ func (s *suite) TestDoAuthorization(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	// Check that when we use incorrect authorization,
-	// we get an error trying to delete the charm
+	// we get an error trying to set the charm's extra-info.
 	client := csclient.New(csclient.Params{
 		URL:      s.srv.URL,
 		User:     s.serverParams.AuthUsername,
 		Password: "bad password",
 	})
-	req, err := http.NewRequest("DELETE", "", nil)
+	req, err := http.NewRequest("PUT", "", nil)
 	c.Assert(err, gc.IsNil)
-	_, err = client.Do(req, "/~charmers/utopic/wordpress-42/archive")
+	_, err = client.Do(req, "/~charmers/utopic/wordpress-42/meta/extra-info/foo")
 	c.Assert(err, gc.ErrorMatches, "invalid user name or password")
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrUnauthorized)
 
@@ -842,15 +847,18 @@ func (s *suite) TestDoAuthorization(c *gc.C) {
 
 	// Then check that when we use the correct authorization,
 	// the delete succeeds.
-	req, err = http.NewRequest("DELETE", "", nil)
+	req, err = http.NewRequest("PUT", "", nil)
 	c.Assert(err, gc.IsNil)
-	resp, err := client.Do(req, "/~charmers/utopic/wordpress-42/archive")
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := client.DoWithBody(req, "/~charmers/utopic/wordpress-42/meta/extra-info/foo", strings.NewReader(`"hello"`))
 	c.Assert(err, gc.IsNil)
 	resp.Body.Close()
 
-	// Check that it's now really gone.
-	err = client.Get("/utopic/wordpress-42/expand-id", nil)
-	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:utopic/wordpress-42"`)
+	// Check that it's really changed.
+	var val string
+	err = client.Get("/utopic/wordpress-42/meta/extra-info/foo", &val)
+	c.Assert(err, gc.IsNil)
+	c.Assert(val, gc.Equals, "hello")
 }
 
 var getWithBadResponseTests = []struct {
@@ -983,6 +991,7 @@ func (s *suite) TestDo(c *gc.C) {
 		42,
 	)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 	err = s.client.PutExtraInfo(url, map[string]interface{}{
 		"foo": "bar",
 	})
@@ -1056,6 +1065,7 @@ func (s *suite) TestMeta(c *gc.C) {
 	purl := charm.MustParseURL("utopic/wordpress-42")
 	err := s.client.UploadCharmWithRevision(url, ch, 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	// Put some extra-info.
 	err = s.client.PutExtraInfo(url, map[string]interface{}{
@@ -1107,7 +1117,7 @@ func (s *suite) TestMeta(c *gc.C) {
 		about:           "id not found",
 		id:              "bogus",
 		expectResult:    &struct{}{},
-		expectError:     `cannot get "/bogus/meta/any": no matching charm or bundle for "cs:bogus"`,
+		expectError:     `cannot get "/bogus/meta/any": no matching charm or bundle for cs:bogus`,
 		expectErrorCode: params.ErrNotFound,
 	}, {
 		about: "unmarshal into invalid type",
@@ -1174,6 +1184,7 @@ func (s *suite) checkPutInfo(c *gc.C, common bool) {
 	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
 	err := s.client.UploadCharmWithRevision(url, ch, 42)
 	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
 
 	// Put some info in.
 	info := map[string]interface{}{
@@ -1232,13 +1243,13 @@ func (s *suite) checkPutInfo(c *gc.C, common bool) {
 
 func (s *suite) TestPutExtraInfoWithError(c *gc.C) {
 	err := s.client.PutExtraInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"attr": "val"})
-	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:wordpress"`)
+	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for cs:wordpress`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
 func (s *suite) TestPutCommonInfoWithError(c *gc.C) {
 	err := s.client.PutCommonInfo(charm.MustParseURL("wordpress"), map[string]interface{}{"homepage": "val"})
-	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for "cs:wordpress"`)
+	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for cs:wordpress`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 }
 
@@ -1428,4 +1439,16 @@ func (s *suite) TestWhoAmI(c *gc.C) {
 	response, err = client.WhoAmI()
 	c.Assert(err, gc.IsNil)
 	c.Assert(response.User, gc.Equals, "bob")
+}
+
+func (s *suite) setPublic(c *gc.C, id *charm.URL) {
+	// Publish to stable.
+	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+		Channels: []params.Channel{params.StableChannel},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
 }
