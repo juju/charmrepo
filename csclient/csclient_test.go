@@ -1515,17 +1515,22 @@ func (s *suite) setPublic(c *gc.C, id *charm.URL) {
 }
 
 func (s *suite) TestLatest(c *gc.C) {
+	fix := csFixture{session: s.Session}
+	srv := fix.startServer(c)
+	defer srv.Close()
+	client := srv.newClient()
+
 	// Add some charms to the charm store.
-	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
-	s.addCharm(c, "~who/precise/wordpress-1", "wordpress")
-	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
-	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
+	srv.addCharm(c, "~who/trusty/mysql-0", "mysql")
+	srv.addCharm(c, "~who/precise/wordpress-1", "wordpress")
+	srv.addCharm(c, "~dalek/trusty/riak-0", "riak")
+	srv.addCharm(c, "~dalek/trusty/riak-1", "riak")
+	srv.addCharm(c, "~dalek/trusty/riak-3", "riak")
+	_, url := srv.addCharm(c, "~who/utopic/varnish-0", "varnish")
 
 	// Change permissions on one of the charms so that it is not readable by
 	// anyone.
-	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
+	err := client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Calculate and store the expected hashes for the uploaded charms.
@@ -1600,14 +1605,56 @@ func (s *suite) TestLatest(c *gc.C) {
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
-		revs, err := s.client.Latest(test.urls)
+		revs, err := client.Latest(test.urls)
 		c.Assert(err, jc.ErrorIsNil)
 		c.Check(revs, jc.DeepEquals, test.revs)
 	}
 }
 
+type csFixture struct {
+	session   *mgo.Session
+	discharge func(cond, arg string) ([]checkers.Caveat, error)
+}
+
+func (fix *csFixture) startServer(c *gc.C) *csServer {
+	serverParams := charmstore.ServerParams{
+		AuthUsername: "test-user",
+		AuthPassword: "test-password",
+	}
+	if fix.discharge != nil {
+		discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond, arg string) ([]checkers.Caveat, error) {
+			return fix.discharge(cond, arg)
+		})
+		serverParams.IdentityLocation = discharger.Service.Location()
+		serverParams.PublicKeyLocator = discharger
+	}
+
+	db := fix.session.DB("charmstore")
+	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V5)
+	c.Assert(err, gc.IsNil)
+	return &csServer{
+		srv:          httptest.NewServer(handler),
+		handler:      handler,
+		serverParams: serverParams,
+	}
+}
+
+type csServer struct {
+	srv          *httptest.Server
+	handler      charmstore.HTTPCloseHandler
+	serverParams charmstore.ServerParams
+}
+
+func (srv csServer) newClient() *csclient.Client {
+	return csclient.New(csclient.Params{
+		URL:      srv.srv.URL,
+		User:     srv.serverParams.AuthUsername,
+		Password: srv.serverParams.AuthPassword,
+	})
+}
+
 // addCharm uploads a charm a promulgated revision to the testing charm store
-func (s *suite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
+func (srv csServer) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
 	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
@@ -1617,14 +1664,32 @@ func (s *suite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL)
 	ch := charmRepo.CharmArchive(c.MkDir(), name)
 
 	// Upload the charm.
-	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
+	client := srv.newClient()
+	err := client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	srv.setPublic(c, id)
+	return ch, id
+}
+
+func (srv csServer) setPublic(c *gc.C, id *charm.URL) {
+	client := srv.newClient()
+
+	// Publish to stable.
+	err := client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+		Channels: []params.Channel{params.StableChannel},
+	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	return ch, id
+	// Allow read permissions to everyone.
+	err = client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (srv csServer) Close() error {
+	srv.srv.Close()
+	srv.handler.Close()
+	return nil
 }
 
 // hashOfCharm returns the SHA256 hash sum for the given charm name.
