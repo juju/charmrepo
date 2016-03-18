@@ -30,14 +30,6 @@ type EventResponse struct {
 	Time     string   `json:"time,omitempty"`
 }
 
-// CharmRevision holds the revision number of a charm and any error
-// encountered in retrieving it.
-type CharmRevision struct {
-	Revision int
-	Sha256   string
-	Err      error
-}
-
 // ResourceResult holds the resources for a given charm and any error
 // encountered in retrieving them.
 type ResourceResult struct {
