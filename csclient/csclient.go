@@ -866,15 +866,3 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 // JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
 // attributes to the charm store.
 const JujuMetadataHTTPHeader = "Juju-Metadata"
-
-// WithJujuAttrs returns a repository Interface with the Juju metadata
-// attributes set.
-func (cs *Client) WithJujuAttrs(attrs map[string]string) *Client {
-	newClient := *cs
-	header := make(http.Header)
-	for k, v := range attrs {
-		header.Add(JujuMetadataHTTPHeader, k+"="+v)
-	}
-	newClient.SetHTTPHeader(header)
-	return &newClient
-}

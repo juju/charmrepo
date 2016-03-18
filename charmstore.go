@@ -279,6 +279,10 @@ const JujuMetadataHTTPHeader = csclient.JujuMetadataHTTPHeader
 // attributes set.
 func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
 	newRepo := *s
-	newRepo.client = newRepo.client.WithJujuAttrs(attrs)
+	header := make(http.Header)
+	for k, v := range attrs {
+		header.Add(JujuMetadataHTTPHeader, k+"="+v)
+	}
+	newRepo.client.SetHTTPHeader(header)
 	return &newRepo
 }
