@@ -195,11 +195,11 @@ func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, 
 	path := "/meta/resources?" + values.Encode()
 
 	// Send the request.
-	var results map[string][]params.Resource
-	if err := c.Get(path, &results); err != nil {
+	var charmID2resources map[string][]params.Resource
+	if err := c.Get(path, &charmID2resources); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
-	return results, nil
+	return charmID2resources, nil
 }
 
 // UploadResource uploads the bytes for a resource.
