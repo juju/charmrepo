@@ -182,7 +182,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
-// ListResources retrieves the metadata about resources for the given charm.
+// ListResources retrieves the metadata about resources for the given charm. It returns a map of charm.URL to resources.
 func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
 	// Prepare the request.
 	urls := make([]string, len(ids))
@@ -195,11 +195,11 @@ func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, 
 	path := "/meta/resources?" + values.Encode()
 
 	// Send the request.
-	var results map[string][]params.Resource
-	if err := c.Get(path, &results); err != nil {
+	var charmID2resources map[string][]params.Resource
+	if err := c.Get(path, &charmID2resources); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
-	return results, nil
+	return charmID2resources, nil
 }
 
 // UploadResource uploads the bytes for a resource.
