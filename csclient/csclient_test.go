@@ -1503,29 +1503,25 @@ func (s *suite) TestPublishNoChannel(c *gc.C) {
 }
 
 func (s *suite) setPublic(c *gc.C, id *charm.URL) {
-	setPublic(c, s.client, id)
-}
-
-func setPublic(c *gc.C, client *csclient.Client, id *charm.URL) {
 	// Publish to stable.
-	err := client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
 		Channels: []params.Channel{params.StableChannel},
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Allow read permissions to everyone.
-	err = client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
 	c.Assert(err, jc.ErrorIsNil)
 }
 
 func (s *suite) TestLatest(c *gc.C) {
 	// Add some charms to the charm store.
-	addCharm(c, s.client, "~who/trusty/mysql-0", "mysql")
-	addCharm(c, s.client, "~who/precise/wordpress-1", "wordpress")
-	addCharm(c, s.client, "~dalek/trusty/riak-0", "riak")
-	addCharm(c, s.client, "~dalek/trusty/riak-1", "riak")
-	addCharm(c, s.client, "~dalek/trusty/riak-3", "riak")
-	_, url := addCharm(c, s.client, "~who/utopic/varnish-0", "varnish")
+	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
+	s.addCharm(c, "~who/precise/wordpress-1", "wordpress")
+	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
+	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
+	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
+	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
 
 	// Change permissions on one of the charms so that it is not readable by
 	// anyone.
@@ -1614,7 +1610,7 @@ func (s *suite) TestLatest(c *gc.C) {
 }
 
 // addCharm uploads a charm a promulgated revision to the testing charm store
-func addCharm(c *gc.C, client *csclient.Client, urlStr, name string) (charm.Charm, *charm.URL) {
+func (s *suite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
 	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
@@ -1624,10 +1620,12 @@ func addCharm(c *gc.C, client *csclient.Client, urlStr, name string) (charm.Char
 	ch := charmRepo.CharmArchive(c.MkDir(), name)
 
 	// Upload the charm.
-	err := client.UploadCharmWithRevision(id, ch, promulgatedRevision)
+	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	setPublic(c, client, id)
+	// Allow read permissions to everyone.
+	s.setPublic(c, id)
+
 	return ch, id
 }
 
