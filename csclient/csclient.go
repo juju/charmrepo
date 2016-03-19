@@ -182,7 +182,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
-// ListResources retrieves the metadata about resources for the given charm.
+// ListResources retrieves the metadata about resources for the given charm. It returns a map of charm.URL to resources.
 func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
 	// Prepare the request.
 	urls := make([]string, len(ids))
