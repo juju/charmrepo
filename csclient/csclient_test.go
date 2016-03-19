@@ -1519,33 +1519,17 @@ func setPublic(c *gc.C, client *csclient.Client, id *charm.URL) {
 }
 
 func (s *suite) TestLatest(c *gc.C) {
-	serverParams := charmstore.ServerParams{
-		AuthUsername: "test-user",
-		AuthPassword: "test-password",
-	}
-	db := s.Session.DB("charmstore")
-	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V5)
-	c.Assert(err, gc.IsNil)
-	defer handler.Close()
-	srv := httptest.NewServer(handler)
-	defer srv.Close()
-	client := csclient.New(csclient.Params{
-		URL:      srv.URL,
-		User:     serverParams.AuthUsername,
-		Password: serverParams.AuthPassword,
-	})
-
 	// Add some charms to the charm store.
-	addCharm(c, client, "~who/trusty/mysql-0", "mysql")
-	addCharm(c, client, "~who/precise/wordpress-1", "wordpress")
-	addCharm(c, client, "~dalek/trusty/riak-0", "riak")
-	addCharm(c, client, "~dalek/trusty/riak-1", "riak")
-	addCharm(c, client, "~dalek/trusty/riak-3", "riak")
-	_, url := addCharm(c, client, "~who/utopic/varnish-0", "varnish")
+	addCharm(c, s.client, "~who/trusty/mysql-0", "mysql")
+	addCharm(c, s.client, "~who/precise/wordpress-1", "wordpress")
+	addCharm(c, s.client, "~dalek/trusty/riak-0", "riak")
+	addCharm(c, s.client, "~dalek/trusty/riak-1", "riak")
+	addCharm(c, s.client, "~dalek/trusty/riak-3", "riak")
+	_, url := addCharm(c, s.client, "~who/utopic/varnish-0", "varnish")
 
 	// Change permissions on one of the charms so that it is not readable by
 	// anyone.
-	err = client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
+	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
 	c.Assert(err, jc.ErrorIsNil)
 
 	// Calculate and store the expected hashes for the uploaded charms.
@@ -1618,6 +1602,9 @@ func (s *suite) TestLatest(c *gc.C) {
 	}}
 
 	// Run the tests.
+	client := csclient.New(csclient.Params{
+		URL: s.srv.URL,
+	})
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.about)
 		revs, err := client.Latest(test.urls)
