@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package params
+package params // import "gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 import (
 	"fmt"
@@ -30,6 +30,8 @@ const (
 	ErrUnauthorized       ErrorCode = "unauthorized"
 	ErrMethodNotAllowed   ErrorCode = "method not allowed"
 	ErrServiceUnavailable ErrorCode = "service unavailable"
+	ErrEntityIdNotAllowed ErrorCode = "charm or bundle id not allowed"
+	ErrInvalidEntity      ErrorCode = "invalid charm or bundle"
 
 	// Note that these error codes sit in the same name space
 	// as the bakery error codes defined in gopkg.in/macaroon-bakery.v0/httpbakery .

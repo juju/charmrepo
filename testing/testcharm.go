@@ -1,12 +1,13 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package testing
+package testing // import "gopkg.in/juju/charmrepo.v2-unstable/testing"
 
 import (
 	"archive/zip"
 	"bytes"
 	"fmt"
+	"io"
 	"os"
 	"path"
 	"strings"
@@ -15,6 +16,7 @@ import (
 	"github.com/juju/testing/filetesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/yaml.v2"
 )
 
 // Charm holds a charm for testing. It does not
@@ -61,14 +63,29 @@ type CharmSpec struct {
 	Revision int
 }
 
-// NewCharm returns a new charm
+type file struct {
+	path string
+	data []byte
+	perm os.FileMode
+}
+
+// NewCharm returns a charm following the given specification.
 func NewCharm(c *gc.C, spec CharmSpec) *Charm {
+	return newCharm(spec)
+}
+
+// newCharm is the internal version of NewCharm that
+// doesn't take a *gc.C so it can be used in NewCharmWithMeta.
+func newCharm(spec CharmSpec) *Charm {
 	ch := &Charm{
 		revision: spec.Revision,
 	}
 	var err error
 	ch.meta, err = charm.ReadMeta(strings.NewReader(spec.Meta))
-	c.Assert(err, gc.IsNil)
+	if err != nil {
+		panic(err)
+	}
+
 	ch.files = append(ch.files, filetesting.File{
 		Path: "metadata.yaml",
 		Data: spec.Meta,
@@ -77,7 +94,9 @@ func NewCharm(c *gc.C, spec CharmSpec) *Charm {
 
 	if spec.Config != "" {
 		ch.config, err = charm.ReadConfig(strings.NewReader(spec.Config))
-		c.Assert(err, gc.IsNil)
+		if err != nil {
+			panic(err)
+		}
 		ch.files = append(ch.files, filetesting.File{
 			Path: "config.yaml",
 			Data: spec.Config,
@@ -86,7 +105,9 @@ func NewCharm(c *gc.C, spec CharmSpec) *Charm {
 	}
 	if spec.Actions != "" {
 		ch.actions, err = charm.ReadActionsYaml(strings.NewReader(spec.Actions))
-		c.Assert(err, gc.IsNil)
+		if err != nil {
+			panic(err)
+		}
 		ch.files = append(ch.files, filetesting.File{
 			Path: "actions.yaml",
 			Data: spec.Actions,
@@ -95,7 +116,9 @@ func NewCharm(c *gc.C, spec CharmSpec) *Charm {
 	}
 	if spec.Metrics != "" {
 		ch.metrics, err = charm.ReadMetrics(strings.NewReader(spec.Metrics))
-		c.Assert(err, gc.IsNil)
+		if err != nil {
+			panic(err)
+		}
 		ch.files = append(ch.files, filetesting.File{
 			Path: "metrics.yaml",
 			Data: spec.Metrics,
@@ -125,6 +148,22 @@ func NewCharm(c *gc.C, spec CharmSpec) *Charm {
 		}
 	}
 	return ch
+}
+
+// NewCharmMeta returns a charm with the given metadata.
+// It doesn't take a *gc.C, so it can be used at init time,
+// for example in table-driven tests.
+func NewCharmMeta(meta *charm.Meta) *Charm {
+	if meta == nil {
+		meta = new(charm.Meta)
+	}
+	metaYAML, err := yaml.Marshal(meta)
+	if err != nil {
+		panic(err)
+	}
+	return newCharm(CharmSpec{
+		Meta: string(metaYAML),
+	})
 }
 
 // Meta implements charm.Charm.Meta.
@@ -171,6 +210,19 @@ func (ch *Charm) Archive() *charm.CharmArchive {
 func (ch *Charm) ArchiveBytes() []byte {
 	ch.makeArchiveOnce.Do(ch.makeArchive)
 	return ch.archiveBytes
+}
+
+// ArchiveTo implements ArchiveTo as implemented
+// by *charm.Dir, enabling the charm to be used in some APIs
+// that check for that method.
+func (c *Charm) ArchiveTo(w io.Writer) error {
+	_, err := w.Write(c.ArchiveBytes())
+	return err
+}
+
+// Size returns the size of the charm's archive blob.
+func (c *Charm) Size() int64 {
+	return int64(len(c.ArchiveBytes()))
 }
 
 func (ch *Charm) makeArchive() {

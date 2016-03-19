@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient
+package csclient // import "gopkg.in/juju/charmrepo.v2-unstable/csclient"
 
 import (
 	"crypto/sha512"
@@ -22,7 +22,8 @@ type ReadSeekCloser interface {
 
 // openArchive is used to turn the current charm or bundle implementations
 // into readers for their corresponding archive.
-// It returns the corresponding archive reader, its SHA384 hash and size.
+// It returns the corresponding archive reader, its hex-encoded SHA384 hash
+// and size.
 func openArchive(entity interface{}) (r ReadSeekCloser, hash string, size int64, err error) {
 	var path string
 	switch entity := entity.(type) {
@@ -65,8 +66,8 @@ func openArchive(entity interface{}) (r ReadSeekCloser, hash string, size int64,
 	return file, hash, size, nil
 }
 
-// readerHashAndSize returns the SHA384 and size of the data included in the
-// given reader.
+// readerHashAndSize returns the hex-encoded SHA384 hash and size of
+// the data included in the given reader.
 func readerHashAndSize(r io.ReadSeeker) (hash string, size int64, err error) {
 	h := sha512.New384()
 	size, err = io.Copy(h, r)

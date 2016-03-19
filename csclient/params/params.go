@@ -4,7 +4,7 @@
 // The params package holds types that are a part of the charm store's external
 // contract - they will be marshalled (or unmarshalled) as JSON
 // and delivered through the HTTP API.
-package params
+package params // import "gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 import (
 	"encoding/json"
@@ -23,6 +23,10 @@ const (
 	// EntityIdHeader specifies the header attribute that will hold the
 	// id of the entity for archive GET responses.
 	EntityIdHeader = "Entity-Id"
+
+	// ResourceRevisionHeader specifies the header attribute that will hold the
+	// revision of the resource retrieved by a resource GET request.
+	ResourceRevisionHeader = "Resource-Revision"
 )
 
 // Special user/group names.
@@ -31,18 +35,32 @@ const (
 	Admin    = "admin"
 )
 
+// Channel is the name of a channel in which an entity may be published.
+type Channel string
+
+const (
+	// DevelopmentChannel is the channel used for charms or bundles under development.
+	DevelopmentChannel Channel = "development"
+
+	// StableChannel is the channel used for stable charms or bundles.
+	StableChannel Channel = "stable"
+
+	// UnpublishedChannel is the default channel to which charms are uploaded.
+	UnpublishedChannel Channel = "unpublished"
+
+	// NoChannel represents where no channel has been specifically requested.
+	NoChannel Channel = ""
+)
+
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
-type MetaAnyResponse struct {
-	Id   *charm.Reference
-	Meta map[string]interface{} `json:",omitempty"`
-}
+type MetaAnyResponse EntityResult
 
 // ArchiveUploadResponse holds the result of a post or a put to /id/archive.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#post-idarchive
 type ArchiveUploadResponse struct {
-	Id            *charm.Reference
-	PromulgatedId *charm.Reference `json:",omitempty"`
+	Id            *charm.URL
+	PromulgatedId *charm.URL `json:",omitempty"`
 }
 
 // Constants for the StatsUpdateRequest
@@ -63,9 +81,9 @@ type StatsUpdateRequest struct {
 // StatsUpdateEntry holds an entry of the StatsUpdateRequest for a put to /stats/update.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
 type StatsUpdateEntry struct {
-	Timestamp      time.Time        // Time when the update did happen.
-	Type           StatsUpdateType  // One of the constant Download, Traffic or Deploy.
-	CharmReference *charm.Reference // The charm to be updated.
+	Timestamp      time.Time       // Time when the update did happen.
+	Type           StatsUpdateType // One of the constant Download, Traffic or Deploy.
+	CharmReference *charm.URL      // The charm to be updated.
 }
 
 // ExpandedId holds a charm or bundle fully qualified id.
@@ -110,17 +128,23 @@ type ArchiveUploadTimeResponse struct {
 type RelatedResponse struct {
 	// Requires holds an entry for each interface provided by
 	// the charm, containing all charms that require that interface.
-	Requires map[string][]MetaAnyResponse `json:",omitempty"`
+	Requires map[string][]EntityResult `json:",omitempty"`
 
 	// Provides holds an entry for each interface required by the
 	// the charm, containing all charms that provide that interface.
-	Provides map[string][]MetaAnyResponse `json:",omitempty"`
+	Provides map[string][]EntityResult `json:",omitempty"`
 }
 
 // RevisionInfoResponse holds the result of an id/meta/revision-info GET
 // request. See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetarevision-info
 type RevisionInfoResponse struct {
-	Revisions []*charm.Reference
+	Revisions []*charm.URL
+}
+
+// SupportedSeries holds the result of an id/meta/supported-series GET
+// request. See See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetasupported-series
+type SupportedSeriesResponse struct {
+	SupportedSeries []string
 }
 
 // SupportedSeries holds the result of an id/meta/supported-series GET
@@ -146,7 +170,7 @@ type TagsResponse struct {
 // Published holds the result of a changes/published GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-changespublished
 type Published struct {
-	Id          *charm.Reference
+	Id          *charm.URL
 	PublishTime time.Time
 }
 
@@ -155,9 +179,9 @@ type Published struct {
 // debugstatus.CheckResult directly.
 type DebugStatus debugstatus.CheckResult
 
-// SearchResult holds a single result from a search operation.
-type SearchResult struct {
-	Id *charm.Reference
+// EntityResult holds a the resolved entity ID along with any requested metadata.
+type EntityResult struct {
+	Id *charm.URL
 	// Meta holds at most one entry for each meta value
 	// specified in the include flags, holding the
 	// data that would be returned by reading /meta/meta?id=id.
@@ -170,7 +194,12 @@ type SearchResult struct {
 type SearchResponse struct {
 	SearchTime time.Duration
 	Total      int
-	Results    []SearchResult
+	Results    []EntityResult
+}
+
+// ListResponse holds the response from a list operation.
+type ListResponse struct {
+	Results []EntityResult
 }
 
 // IdUserResponse holds the result of an id/meta/id-user GET request.
@@ -200,7 +229,7 @@ type IdRevisionResponse struct {
 // IdResponse holds the result of an id/meta/id GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid
 type IdResponse struct {
-	Id       *charm.Reference
+	Id       *charm.URL
 	User     string `json:",omitempty"`
 	Series   string `json:",omitempty"`
 	Name     string
@@ -233,11 +262,90 @@ type PromulgateRequest struct {
 	Promulgated bool
 }
 
+// PublishRequest holds the request of an id/publish PUT request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+type PublishRequest struct {
+	Channels []Channel
+	// Resources defines the resource revisions to use for the charm.
+	// Each resource in the charm's metadata.yaml (if any) must have its
+	// name mapped to a revision. That revision must be one of the
+	// existing revisions for that resource.
+	Resources map[string]int `json:",omitempty"`
+}
+
+// PublishResponse holds the result of an id/publish PUT request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+type PublishResponse struct {
+	Id            *charm.URL
+	PromulgatedId *charm.URL `json:",omitempty"`
+}
+
+// PublishedResponse holds the result of an id/meta/published GET request.
+type PublishedResponse struct {
+	// Channels holds an entry for each channel that the
+	// entity has been published to.
+	Info []PublishedInfo
+}
+
+// PublishedInfo holds information on a channel that an entity
+// has been published to.
+type PublishedInfo struct {
+	// Channel holds the value of the channel that
+	// the entity has been published to.
+	// This will never be "unpublished" as entities
+	// cannot be published to that channel.
+	Channel Channel
+
+	// Current holds whether the entity is the most
+	// recently published member of the channel.
+	Current bool
+}
+
 // WhoAmIResponse holds the result of a whoami GET request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#whoami
 type WhoAmIResponse struct {
 	User   string
 	Groups []string
+}
+
+// Resource describes a resource in the charm store.
+type Resource struct {
+	// Name identifies the resource.
+	Name string
+
+	// Type is the name of the resource type.
+	Type string
+
+	// Path is where the resource will be stored.
+	Path string
+
+	// Description contains user-facing info about the resource.
+	Description string `json:",omitempty"`
+
+	// Origin is where the resource will come from.
+	Origin string
+
+	// Revision is the revision, if applicable.
+	Revision int
+
+	// Fingerprint is the SHA-384 checksum for the resource blob.
+	Fingerprint []byte
+
+	// Size is the size of the resource, in bytes.
+	Size int64
+}
+
+// ResourceUploadResponse holds the result of a post or a put to /id/resources/name.
+type ResourceUploadResponse struct {
+	Revision int
+}
+
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Sha256   string
+	Err      error
 }
 
 const (
@@ -265,7 +373,7 @@ type Log struct {
 	Type LogType
 
 	// URLs holds a slice of entity URLs associated with the log message.
-	URLs []*charm.Reference `json:",omitempty"`
+	URLs []*charm.URL `json:",omitempty"`
 }
 
 // LogResponse represents a single log message and is used in the responses
@@ -282,7 +390,7 @@ type LogResponse struct {
 	Type LogType
 
 	// URLs holds a slice of entity URLs associated with the log message.
-	URLs []*charm.Reference `json:",omitempty"`
+	URLs []*charm.URL `json:",omitempty"`
 
 	// Time holds the time of the log.
 	Time time.Time

@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmrepo
+package charmrepo // import "gopkg.in/juju/charmrepo.v2-unstable"
 
 import (
 	"encoding/json"
@@ -77,22 +77,23 @@ func (s *LegacyCharmStore) get(url string) (resp *http.Response, err error) {
 }
 
 // Resolve canonicalizes charm URLs any implied series in the reference.
-func (s *LegacyCharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *LegacyCharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	infos, err := s.Info(ref)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if len(infos) == 0 {
-		return nil, fmt.Errorf("missing response when resolving charm URL: %q", ref)
+		return nil, nil, fmt.Errorf("missing response when resolving charm URL: %q", ref)
 	}
 	if infos[0].CanonicalURL == "" {
-		return nil, fmt.Errorf("cannot resolve charm URL: %q", ref)
+		return nil, nil, fmt.Errorf("cannot resolve charm URL: %q", ref)
 	}
 	curl, err := charm.ParseURL(infos[0].CanonicalURL)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
-	return curl, nil
+	// Legacy store does not support returning the supported series.
+	return curl, nil, nil
 }
 
 // Info returns details for all the specified charms in the charm store.
@@ -182,6 +183,14 @@ func (s *LegacyCharmStore) Event(curl *charm.URL, digest string) (*EventResponse
 		}
 	}
 	return event, nil
+}
+
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Sha256   string
+	Err      error
 }
 
 // revisions returns the revisions of the charms referenced by curls.
@@ -356,7 +365,7 @@ func (s *LegacyCharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 
 // LegacyInferRepository returns a charm repository inferred from the provided
 // charm or bundle reference. Local references will use the provided path.
-func LegacyInferRepository(ref *charm.Reference, localRepoPath string) (repo Interface, err error) {
+func LegacyInferRepository(ref *charm.URL, localRepoPath string) (repo Interface, err error) {
 	switch ref.Schema {
 	case "cs":
 		repo = LegacyStore

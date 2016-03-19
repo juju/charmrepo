@@ -12,7 +12,6 @@ import (
 	"net/http/httptest"
 	"os"
 	"path/filepath"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -24,10 +23,10 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charmstore.v5-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
-	"gopkg.in/juju/charmrepo.v1/csclient"
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v1/testing"
+	"gopkg.in/juju/charmrepo.v2-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v2-unstable/testing"
 )
 
 type charmStoreSuite struct {
@@ -36,16 +35,9 @@ type charmStoreSuite struct {
 
 var _ = gc.Suite(&charmStoreSuite{})
 
-func (s *charmStoreSuite) TestURL(c *gc.C) {
-	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
-		URL: "https://1.2.3.4/charmstore",
-	})
-	c.Assert(repo.(*charmrepo.CharmStore).URL(), gc.Equals, "https://1.2.3.4/charmstore")
-}
-
 func (s *charmStoreSuite) TestDefaultURL(c *gc.C) {
 	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{})
-	c.Assert(repo.(*charmrepo.CharmStore).URL(), gc.Equals, csclient.ServerURL)
+	c.Assert(repo.Client().ServerURL(), gc.Equals, csclient.ServerURL)
 }
 
 type charmStoreBaseSuite struct {
@@ -53,7 +45,7 @@ type charmStoreBaseSuite struct {
 	srv     *httptest.Server
 	client  *csclient.Client
 	handler charmstore.HTTPCloseHandler
-	repo    charmrepo.Interface
+	repo    *charmrepo.CharmStore
 }
 
 var _ = gc.Suite(&charmStoreBaseSuite{})
@@ -80,7 +72,7 @@ func (s *charmStoreBaseSuite) startServer(c *gc.C) {
 	}
 
 	db := s.Session.DB("charmstore")
-	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V4)
+	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V5)
 	c.Assert(err, gc.IsNil)
 	s.handler = handler
 	s.srv = httptest.NewServer(handler)
@@ -91,10 +83,10 @@ func (s *charmStoreBaseSuite) startServer(c *gc.C) {
 	})
 }
 
-// addCharm uploads a charm to the testing charm store, and returns the
-// resulting charm and charm URL.
+// addCharm uploads a charm a promulgated revision to the testing charm store,
+// and returns the resulting charm and charm URL.
 func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
-	id := charm.MustParseReference(urlStr)
+	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
 		id.User = "who"
@@ -106,20 +98,32 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	s.setPublic(c, id)
+	return ch, id
+}
 
-	// Return the charm and its URL.
-	url, err := id.URL("")
+// addCharmNoRevision uploads a charm to the testing charm store, and returns the
+// resulting charm and charm URL.
+func (s *charmStoreBaseSuite) addCharmNoRevision(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL) {
+	id := charm.MustParseURL(urlStr)
+	if id.User == "" {
+		id.User = "who"
+	}
+	ch := TestCharms.CharmArchive(c.MkDir(), name)
+
+	// Upload the charm.
+	url, err := s.client.UploadCharm(id, ch)
 	c.Assert(err, gc.IsNil)
+
+	s.setPublic(c, id)
+
 	return ch, url
 }
 
 // addBundle uploads a bundle to the testing charm store, and returns the
 // resulting bundle and bundle URL.
 func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bundle, *charm.URL) {
-	id := charm.MustParseReference(urlStr)
+	id := charm.MustParseURL(urlStr)
 	promulgatedRevision := -1
 	if id.User == "" {
 		id.User = "who"
@@ -131,14 +135,22 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	err := s.client.UploadBundleWithRevision(id, b, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	s.setPublic(c, id)
 
 	// Return the bundle and its URL.
-	url, err := id.URL("")
-	c.Assert(err, gc.IsNil)
-	return b, url
+	return b, id
+}
+
+func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL) {
+	// Publish to stable.
+	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+		Channels: []params.Channel{params.StableChannel},
+	})
+	c.Assert(err, jc.ErrorIsNil)
+
+	// Allow read permissions to everyone.
+	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 type charmStoreRepoSuite struct {
@@ -172,6 +184,14 @@ func (s *charmStoreRepoSuite) checkCharmDownloads(c *gc.C, url *charm.URL, expec
 		}
 	}
 	c.Errorf("downloads count for %s is %d, expected %d", url, count, expect)
+}
+
+func (s *charmStoreRepoSuite) TestNewCharmStoreFromClient(c *gc.C) {
+	client := csclient.New(csclient.Params{URL: csclient.ServerURL})
+
+	repo := charmrepo.NewCharmStoreFromClient(client)
+
+	c.Check(repo.Client().ServerURL(), gc.Equals, csclient.ServerURL)
 }
 
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
@@ -261,6 +281,9 @@ func (s *charmStoreRepoSuite) TestGetInvalidCache(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
+	if jujutesting.MgoServer.WithoutV8 {
+		c.Skip("mongo javascript not enabled")
+	}
 	_, url := s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 
 	// Retrieve the charm.
@@ -272,57 +295,6 @@ func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
 	_, err = s.repo.Get(url)
 	c.Assert(err, jc.ErrorIsNil)
 	s.checkCharmDownloads(c, url, 2)
-}
-
-func (s *charmStoreRepoSuite) TestGetWithTestMode(c *gc.C) {
-	_, url := s.addCharm(c, "~who/precise/wordpress-42", "wordpress")
-
-	// Use a repo with test mode enabled to download a charm a couple of
-	// times, and check the downloads count is not increased.
-	repo := s.repo.(*charmrepo.CharmStore).WithTestMode()
-	_, err := repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-	_, err = repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-	s.checkCharmDownloads(c, url, 0)
-}
-
-func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
-	_, url := s.addCharm(c, "trusty/riak-0", "riak")
-
-	// Set up a proxy server that stores the request header.
-	var header http.Header
-	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		header = r.Header
-		s.handler.ServeHTTP(w, r)
-	}))
-	defer srv.Close()
-
-	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
-		URL: srv.URL,
-	})
-
-	// Make a first request without Juju attrs.
-	_, err := repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
-
-	// Make a second request after setting Juju attrs.
-	repo = repo.(*charmrepo.CharmStore).WithJujuAttrs(map[string]string{
-		"k1": "v1",
-		"k2": "v2",
-	})
-	_, err = repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-	values := header[http.CanonicalHeaderKey(charmrepo.JujuMetadataHTTPHeader)]
-	sort.Strings(values)
-	c.Assert(values, jc.DeepEquals, []string{"k1=v1", "k2=v2"})
-
-	// Make a third request after restoring empty attrs.
-	repo = repo.(*charmrepo.CharmStore).WithJujuAttrs(nil)
-	_, err = repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
 }
 
 func (s *charmStoreRepoSuite) TestGetErrorBundle(c *gc.C) {
@@ -407,134 +379,59 @@ func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
 	c.Assert(ch, gc.IsNil)
 }
 
-func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
-	// Add some charms to the charm store.
-	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
-	s.addCharm(c, "~who/precise/wordpress-1", "wordpress")
-	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
-	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
-
-	// Change permissions on one of the charms so that it is not readable by
-	// anyone.
-	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Calculate and store the expected hashes for the uploaded charms.
-	mysqlHash := hashOfCharm(c, "mysql")
-	wordpressHash := hashOfCharm(c, "wordpress")
-	riakHash := hashOfCharm(c, "riak")
-
-	// Define the tests to be run.
-	tests := []struct {
-		about string
-		urls  []*charm.URL
-		revs  []charmrepo.CharmRevision
-	}{{
-		about: "no urls",
-	}, {
-		about: "charm not found",
-		urls:  []*charm.URL{charm.MustParseURL("cs:trusty/no-such-42")},
-		revs: []charmrepo.CharmRevision{{
-			Err: charmrepo.CharmNotFound("cs:trusty/no-such"),
-		}},
-	}, {
-		about: "resolve",
-		urls: []*charm.URL{
-			charm.MustParseURL("cs:~who/trusty/mysql-42"),
-			charm.MustParseURL("cs:~who/trusty/mysql-0"),
-			charm.MustParseURL("cs:~who/trusty/mysql"),
-		},
-		revs: []charmrepo.CharmRevision{{
-			Revision: 0,
-			Sha256:   mysqlHash,
-		}, {
-			Revision: 0,
-			Sha256:   mysqlHash,
-		}, {
-			Revision: 0,
-			Sha256:   mysqlHash,
-		}},
-	}, {
-		about: "multiple charms",
-		urls: []*charm.URL{
-			charm.MustParseURL("cs:~who/precise/wordpress"),
-			charm.MustParseURL("cs:~who/trusty/mysql-47"),
-			charm.MustParseURL("cs:~dalek/trusty/no-such"),
-			charm.MustParseURL("cs:~dalek/trusty/riak-0"),
-		},
-		revs: []charmrepo.CharmRevision{{
-			Revision: 1,
-			Sha256:   wordpressHash,
-		}, {
-			Revision: 0,
-			Sha256:   mysqlHash,
-		}, {
-			Err: charmrepo.CharmNotFound("cs:~dalek/trusty/no-such"),
-		}, {
-			Revision: 3,
-			Sha256:   riakHash,
-		}},
-	}, {
-		about: "unauthorized",
-		urls: []*charm.URL{
-			charm.MustParseURL("cs:~who/precise/wordpress"),
-			url,
-		},
-		revs: []charmrepo.CharmRevision{{
-			Revision: 1,
-			Sha256:   wordpressHash,
-		}, {
-			Err: charmrepo.CharmNotFound("cs:~who/utopic/varnish"),
-		}},
-	}}
-
-	// Run the tests.
-	for i, test := range tests {
-		c.Logf("test %d: %s", i, test.about)
-		revs, err := s.repo.Latest(test.urls...)
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(revs, jc.DeepEquals, test.revs)
-	}
-}
-
 func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	// Add some charms to the charm store.
+
+	// Add promulgated entities first so that the base entity
+	// is marked as promulgated when it first gets inserted.
+	s.addCharm(c, "utopic/mysql-47", "mysql")
+	s.addCharmNoRevision(c, "multi-series", "multi-series")
+
 	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
 	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
-	s.addCharm(c, "utopic/mysql-47", "mysql")
 
 	// Define the tests to be run.
 	tests := []struct {
-		id  string
-		url string
-		err string
+		id              string
+		url             string
+		supportedSeries []string
+		err             string
 	}{{
-		id:  "~who/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/trusty/mysql",
-		url: "cs:~who/trusty/mysql-0",
+		id:              "~who/trusty/mysql",
+		url:             "cs:~who/trusty/mysql-0",
+		supportedSeries: []string{"trusty"},
 	}, {
-		id:  "~who/wordpress",
-		url: "cs:~who/precise/wordpress-2",
+		id:              "~who/wordpress",
+		url:             "cs:~who/precise/wordpress-2",
+		supportedSeries: []string{"precise"},
 	}, {
 		id:  "~who/wordpress-2",
-		url: "cs:~who/precise/wordpress-2",
+		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
 	}, {
-		id:  "~dalek/riak",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/riak",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "~dalek/utopic/riak-42",
-		url: "cs:~dalek/utopic/riak-42",
+		id:              "~dalek/utopic/riak-42",
+		url:             "cs:~dalek/utopic/riak-42",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
 	}, {
-		id:  "utopic/mysql-47",
-		url: "cs:utopic/mysql-47",
+		id:              "utopic/mysql-47",
+		url:             "cs:utopic/mysql-47",
+		supportedSeries: []string{"utopic"},
+	}, {
+		id:              "~who/multi-series",
+		url:             "cs:~who/multi-series-0",
+		supportedSeries: []string{"trusty", "precise", "quantal"},
 	}, {
 		id:  "~dalek/utopic/riak-100",
 		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
@@ -543,20 +440,21 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
 	}, {
 		id:  "no-such",
-		err: `cannot resolve URL "cs:no-such": entity not found`,
+		err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
 	}}
 
 	// Run the tests.
 	for i, test := range tests {
 		c.Logf("test %d: %s", i, test.id)
-		url, err := s.repo.Resolve(charm.MustParseReference(test.id))
+		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
-			c.Assert(err.Error(), gc.Equals, test.err)
-			c.Assert(url, gc.IsNil)
+			c.Check(err.Error(), gc.Equals, test.err)
+			c.Check(ref, gc.IsNil)
 			continue
 		}
 		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(url, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
 	}
 }
 

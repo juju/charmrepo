@@ -14,8 +14,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
-	charmtesting "gopkg.in/juju/charmrepo.v1/testing"
+	"gopkg.in/juju/charmrepo.v2-unstable"
+	charmtesting "gopkg.in/juju/charmrepo.v2-unstable/testing"
 )
 
 type legacyCharmStoreSuite struct {
@@ -56,8 +56,10 @@ func (s *legacyCharmStoreSuite) TearDownSuite(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestMissing(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/missing")
 	expect := `charm not found: cs:series/missing`
-	_, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(err, gc.ErrorMatches, expect)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Err, gc.ErrorMatches, expect)
 	_, err = s.store.Get(charmURL)
 	c.Assert(err, gc.ErrorMatches, expect)
 }
@@ -65,8 +67,10 @@ func (s *legacyCharmStoreSuite) TestMissing(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestError(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/borken")
 	expect := `charm info errors for "cs:series/borken": badness`
-	_, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(err, gc.ErrorMatches, expect)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Err, gc.ErrorMatches, expect)
 	_, err = s.store.Get(charmURL)
 	c.Assert(err, gc.ErrorMatches, expect)
 }
@@ -74,8 +78,10 @@ func (s *legacyCharmStoreSuite) TestError(c *gc.C) {
 func (s *legacyCharmStoreSuite) TestWarning(c *gc.C) {
 	charmURL := charm.MustParseURL("cs:series/unwise")
 	expect := `.* WARNING juju.charm.charmrepo charm store reports for "cs:series/unwise": foolishness` + "\n"
-	r, err := charmrepo.Latest(s.store, charmURL)
-	c.Assert(r, gc.Equals, 23)
+	revs, err := s.store.Latest(charmURL)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(revs, gc.HasLen, 1)
+	c.Assert(revs[0].Revision, gc.Equals, 23)
 	c.Assert(err, gc.IsNil)
 	c.Assert(c.GetTestLog(), gc.Matches, expect)
 	ch, err := s.store.Get(charmURL)
@@ -382,7 +388,7 @@ var legacyInferRepositoryTests = []struct {
 func (s *legacyCharmStoreSuite) TestInferRepository(c *gc.C) {
 	for i, t := range legacyInferRepositoryTests {
 		c.Logf("test %d", i)
-		ref, err := charm.ParseReference(t.url)
+		ref, err := charm.ParseURL(t.url)
 		c.Assert(err, gc.IsNil)
 		repo, err := charmrepo.LegacyInferRepository(ref, "/some/path")
 		c.Assert(err, gc.IsNil)
@@ -393,7 +399,7 @@ func (s *legacyCharmStoreSuite) TestInferRepository(c *gc.C) {
 			c.Assert(repo, gc.Equals, charmrepo.LegacyStore)
 		}
 	}
-	ref, err := charm.ParseReference("local:whatever")
+	ref, err := charm.ParseURL("local:whatever")
 	c.Assert(err, gc.IsNil)
 	_, err = charmrepo.LegacyInferRepository(ref, "")
 	c.Assert(err, gc.ErrorMatches, "path to local repository not specified")

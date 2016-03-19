@@ -18,7 +18,7 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/yaml.v1"
 
-	"gopkg.in/juju/charmrepo.v1"
+	"gopkg.in/juju/charmrepo.v2-unstable"
 )
 
 var _ = gc.Suite(&migrateSuite{})
@@ -436,7 +436,7 @@ var migrateTests = []struct {
 func (*migrateSuite) TestMigrate(c *gc.C) {
 	for i, test := range migrateTests {
 		c.Logf("test %d: %s", i, test.about)
-		result, err := Migrate(unbeautify(test.bundles), func(id *charm.Reference) (bool, error) {
+		result, err := Migrate(unbeautify(test.bundles), func(id *charm.URL) (bool, error) {
 			return test.subords[id.String()], nil
 		})
 		if test.expectError != "" {
@@ -456,7 +456,7 @@ func (*migrateSuite) TestMigrateWithSubordinateStatusError(c *gc.C) {
 		|            charm: precise/wordpress
 		|`,
 	)
-	result, err := Migrate(bdata, func(*charm.Reference) (bool, error) {
+	result, err := Migrate(bdata, func(*charm.URL) (bool, error) {
 		return false, fmt.Errorf("oops")
 	})
 	c.Assert(result, gc.IsNil)
@@ -469,7 +469,7 @@ func (*migrateSuite) TestMigrateAll(c *gc.C) {
 	doAllBundles(c, func(c *gc.C, id string, data []byte) {
 		c.Logf("\nmigrate test %s", id)
 		ok := true
-		bundles, err := Migrate(data, func(id *charm.Reference) (bool, error) {
+		bundles, err := Migrate(data, func(id *charm.URL) (bool, error) {
 			meta, err := getCharm(id)
 			if err != nil {
 				return false, err
@@ -496,7 +496,7 @@ func checkBundleData(c *gc.C, bd *charm.BundleData) bool {
 	charms := make(map[string]charm.Charm)
 	ok := true
 	for _, svc := range bd.Services {
-		id, err := charm.ParseReference(svc.Charm)
+		id, err := charm.ParseURL(svc.Charm)
 		if err != nil {
 			ok = false
 			c.Logf("cannot parse %q: %v", svc.Charm, err)
@@ -514,7 +514,7 @@ func checkBundleData(c *gc.C, bd *charm.BundleData) bool {
 		charms[svc.Charm] = ch
 	}
 	if ok {
-		if err := bd.VerifyWithCharms(nil, charms); err != nil {
+		if err := bd.VerifyWithCharms(nil, nil, charms); err != nil {
 			for _, err := range err.(*charm.VerificationError).Errors {
 				c.Logf("verification error: %v", err)
 			}
@@ -893,27 +893,23 @@ func unbeautify(s string) []byte {
 	return []byte(indentReplacer.Replace(s))
 }
 
-func noCharms(id *charm.Reference) (*charm.Meta, error) {
+func noCharms(id *charm.URL) (*charm.Meta, error) {
 	return nil, fmt.Errorf("charm %q not found", id)
 }
 
-func getCharm(id *charm.Reference) (charm.Charm, error) {
-	url, err := id.URL("")
-	if err != nil {
-		return nil, fmt.Errorf("cannot make URL from %q: %v", id, err)
-	}
+func getCharm(id *charm.URL) (charm.Charm, error) {
 	charmDataCacheMutex.Lock()
 	defer charmDataCacheMutex.Unlock()
-	if m, ok := charmDataCache[url.String()]; ok || !*updateCharms {
+	if m, ok := charmDataCache[id.String()]; ok || !*updateCharms {
 		if m == nil {
 			return nil, fmt.Errorf("charm %q not found in cache", id)
 		}
 		return m, nil
 	}
-	log.Printf("getting %s", url)
-	ch, err := charmrepo.LegacyStore.Get(url)
+	log.Printf("getting %s", id)
+	ch, err := charmrepo.LegacyStore.Get(id)
 	if err != nil {
-		charmDataCache[url.String()] = nil
+		charmDataCache[id.String()] = nil
 		return nil, err
 	}
 	chData := &charmData{
@@ -921,7 +917,7 @@ func getCharm(id *charm.Reference) (charm.Charm, error) {
 		Config_:  ch.Config(),
 		Metrics_: ch.Metrics(),
 	}
-	charmDataCache[url.String()] = chData
+	charmDataCache[id.String()] = chData
 	return chData, nil
 }
 

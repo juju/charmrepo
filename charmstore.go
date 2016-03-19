@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the AGPLv3, see LICENCE file for details.
 
-package charmrepo
+package charmrepo // import "gopkg.in/juju/charmrepo.v2-unstable"
 
 import (
 	"crypto/sha512"
@@ -16,9 +16,10 @@ import (
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v1/csclient"
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 )
 
 // CacheDir stores the charm cache directory path.
@@ -40,6 +41,11 @@ type NewCharmStoreParams struct {
 	// If empty, the default charm store client location is used.
 	URL string
 
+	// BakeryClient holds the bakery client to use when making
+	// requests to the store. This is used in preference to
+	// HTTPClient.
+	BakeryClient *httpbakery.Client
+
 	// HTTPClient holds the HTTP client to use when making
 	// requests to the store. If nil, httpbakery.NewHTTPClient will
 	// be used.
@@ -47,8 +53,17 @@ type NewCharmStoreParams struct {
 
 	// VisitWebPage is called when authorization requires that
 	// the user visits a web page to authenticate themselves.
-	// If nil, a default function that returns an error will be used.
+	// If nil, no interaction will be allowed. This field
+	// is ignored if BakeryClient is provided.
 	VisitWebPage func(url *url.URL) error
+
+	// User holds the name to authenticate as for the client. If User is empty,
+	// no credentials will be sent.
+	User string
+
+	// Password holds the password for the given user, for authenticating the
+	// client.
+	Password string
 }
 
 // NewCharmStore creates and returns a charm store repository.
@@ -57,14 +72,30 @@ type NewCharmStoreParams struct {
 // The errors returned from the interface methods will
 // preserve the causes returned from the underlying csclient
 // methods.
-func NewCharmStore(p NewCharmStoreParams) Interface {
+func NewCharmStore(p NewCharmStoreParams) *CharmStore {
+	client := csclient.New(csclient.Params{
+		URL:          p.URL,
+		BakeryClient: p.BakeryClient,
+		HTTPClient:   p.HTTPClient,
+		VisitWebPage: p.VisitWebPage,
+		User:         p.User,
+		Password:     p.Password,
+	})
+	return NewCharmStoreFromClient(client)
+}
+
+// NewCharmStoreFromClient creates and returns a charm store repository.
+// The provided client is used for charm store requests.
+func NewCharmStoreFromClient(client *csclient.Client) *CharmStore {
 	return &CharmStore{
-		client: csclient.New(csclient.Params{
-			URL:          p.URL,
-			HTTPClient:   p.HTTPClient,
-			VisitWebPage: p.VisitWebPage,
-		}),
+		client: client,
 	}
+}
+
+// Client returns the charmstore client that the CharmStore
+// implementation uses under the hood.
+func (s *CharmStore) Client() *csclient.Client {
+	return s.client
 }
 
 // Get implements Interface.Get.
@@ -112,7 +143,7 @@ func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 	if curl.Series == "bundle" {
 		etype = "bundle"
 	}
-	r, id, expectHash, expectSize, err := s.client.GetArchive(curl.Reference())
+	r, id, expectHash, expectSize, err := s.client.GetArchive(curl)
 	if err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
@@ -179,63 +210,11 @@ func verifyHash384AndSize(path, expectHash string, expectSize int64) error {
 	return nil
 }
 
-// Latest implements Interface.Latest.
-func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
-	if len(curls) == 0 {
-		return nil, nil
-	}
-
-	// Prepare the request to the charm store.
-	urls := make([]string, len(curls))
-	values := url.Values{}
-	// Include the ignore-auth flag so that non-public results do not generate
-	// an error for the whole request.
-	values.Add("ignore-auth", "1")
-	values.Add("include", "id-revision")
-	values.Add("include", "hash256")
-	for i, curl := range curls {
-		url := curl.WithRevision(-1).String()
-		urls[i] = url
-		values.Add("id", url)
-	}
-	u := url.URL{
-		Path:     "/meta/any",
-		RawQuery: values.Encode(),
-	}
-
-	// Execute the request and retrieve results.
-	var results map[string]struct {
-		Meta struct {
-			IdRevision params.IdRevisionResponse `json:"id-revision"`
-			Hash256    params.HashResponse       `json:"hash256"`
-		}
-	}
-	if err := s.client.Get(u.String(), &results); err != nil {
-		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
-	}
-
-	// Build the response.
-	responses := make([]CharmRevision, len(curls))
-	for i, url := range urls {
-		result, found := results[url]
-		if !found {
-			responses[i] = CharmRevision{
-				Err: CharmNotFound(url),
-			}
-			continue
-		}
-		responses[i] = CharmRevision{
-			Revision: result.Meta.IdRevision.Revision,
-			Sha256:   result.Meta.Hash256.Sum,
-		}
-	}
-	return responses, nil
-}
-
 // Resolve implements Interface.Resolve.
-func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
+func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	var result struct {
-		Id params.IdResponse
+		Id              params.IdResponse
+		SupportedSeries params.SupportedSeriesResponse
 	}
 	if _, err := s.client.Meta(ref, &result); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
@@ -245,45 +224,11 @@ func (s *CharmStore) Resolve(ref *charm.Reference) (*charm.URL, error) {
 			case "bundle":
 				etype = "bundle"
 			case "":
-				etype = "entity"
+				etype = "charm or bundle"
 			}
-			return nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
+			return nil, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
+		return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
-	url, err := result.Id.Id.URL("")
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot make fully resolved entity URL from %s", url)
-	}
-	return url, nil
-}
-
-// URL returns the root endpoint URL of the charm store.
-func (s *CharmStore) URL() string {
-	return s.client.ServerURL()
-}
-
-// WithTestMode returns a repository Interface where test mode is enabled,
-// meaning charm store download stats are not increased when charms are
-// retrieved.
-func (s *CharmStore) WithTestMode() Interface {
-	newRepo := *s
-	newRepo.client.DisableStats()
-	return &newRepo
-}
-
-// JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
-// attributes to the charm store.
-const JujuMetadataHTTPHeader = "Juju-Metadata"
-
-// WithJujuAttrs returns a repository Interface with the Juju metadata
-// attributes set.
-func (s *CharmStore) WithJujuAttrs(attrs map[string]string) Interface {
-	newRepo := *s
-	header := make(http.Header)
-	for k, v := range attrs {
-		header.Add(JujuMetadataHTTPHeader, k+"="+v)
-	}
-	newRepo.client.SetHTTPHeader(header)
-	return &newRepo
+	return result.Id.Id, result.SupportedSeries.SupportedSeries, nil
 }

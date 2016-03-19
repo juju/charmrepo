@@ -2,7 +2,7 @@
 // Licensed under the LGPLv3, see LICENCE file for details.
 
 // The csclient package provides access to the charm store API.
-package csclient
+package csclient // import "gopkg.in/juju/charmrepo.v2-unstable/csclient"
 
 import (
 	"bytes"
@@ -14,6 +14,7 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 
@@ -21,10 +22,10 @@ import (
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v1/csclient/params"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 )
 
-const apiVersion = "v4"
+const apiVersion = "v5"
 
 // ServerURL holds the default location of the global charm store.
 // An alternate location can be configured by changing the URL field in the
@@ -36,9 +37,10 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 // Client represents the client side of a charm store.
 type Client struct {
 	params        Params
-	bclient       *httpbakery.Client
+	bclient       httpClient
 	header        http.Header
 	statsDisabled bool
+	channel       params.Channel
 }
 
 // Params holds parameters for creating a new charm store client.
@@ -49,11 +51,18 @@ type Params struct {
 	// If empty, the default charm store client location is used.
 	URL string
 
-	// User and Password hold the authentication credentials
-	// for the client. If User is empty, no credentials will be
-	// sent.
-	User     string
+	// User holds the name to authenticate as for the client. If User is empty,
+	// no credentials will be sent.
+	User string
+
+	// Password holds the password for the given user, for authenticating the
+	// client.
 	Password string
+
+	// BakeryClient holds the bakery client to use when making
+	// requests to the store. This is used in preference to
+	// HTTPClient.
+	BakeryClient *httpbakery.Client
 
 	// HTTPClient holds the HTTP client to use when making
 	// requests to the store. If nil, httpbakery.NewHTTPClient will
@@ -62,8 +71,13 @@ type Params struct {
 
 	// VisitWebPage is called when authorization requires that
 	// the user visits a web page to authenticate themselves.
-	// If nil, no interaction will be allowed.
+	// If nil, no interaction will be allowed. This field
+	// is ignored if BakeryClient is provided.
 	VisitWebPage func(url *url.URL) error
+}
+
+type httpClient interface {
+	DoWithBody(*http.Request, io.ReadSeeker) (*http.Response, error)
 }
 
 // New returns a new charm store client.
@@ -71,15 +85,19 @@ func New(p Params) *Client {
 	if p.URL == "" {
 		p.URL = ServerURL
 	}
-	if p.HTTPClient == nil {
-		p.HTTPClient = httpbakery.NewHTTPClient()
-	}
-	return &Client{
-		params: p,
-		bclient: &httpbakery.Client{
+	bclient := p.BakeryClient
+	if bclient == nil {
+		if p.HTTPClient == nil {
+			p.HTTPClient = httpbakery.NewHTTPClient()
+		}
+		bclient = &httpbakery.Client{
 			Client:       p.HTTPClient,
 			VisitWebPage: p.VisitWebPage,
-		},
+		}
+	}
+	return &Client{
+		bclient: bclient,
+		params:  p,
 	}
 }
 
@@ -94,6 +112,14 @@ func (c *Client) DisableStats() {
 	c.statsDisabled = true
 }
 
+// WithChannel returns a new client whose requests are done using the
+// given channel.
+func (c *Client) WithChannel(channel params.Channel) *Client {
+	client := *c
+	client.channel = channel
+	return &client
+}
+
 // SetHTTPHeader sets custom HTTP headers that will be sent to the charm store
 // on each request.
 func (c *Client) SetHTTPHeader(header http.Header) {
@@ -102,8 +128,8 @@ func (c *Client) SetHTTPHeader(header http.Header) {
 
 // GetArchive retrieves the archive for the given charm or bundle, returning a
 // reader its data can be read from, the fully qualified id of the
-// corresponding entity, the SHA384 hash of the data and its size.
-func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Reference, hash string, size int64, err error) {
+// corresponding entity, the hex-encoded SHA384 hash of the data and its size.
+func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error) {
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
@@ -130,13 +156,13 @@ func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Re
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Newf("no %s header found in response", params.EntityIdHeader)
 	}
-	eid, err = charm.ParseReference(entityId)
+	eid, err = charm.ParseURL(entityId)
 	if err != nil {
 		// The server did not return a valid id.
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Notef(err, "invalid entity id found in response")
 	}
-	if eid.Series == "" || eid.Revision == -1 {
+	if eid.Revision == -1 {
 		// The server did not return a fully qualified entity id.
 		resp.Body.Close()
 		return nil, nil, "", 0, errgo.Newf("archive get returned not fully qualified entity id %q", eid)
@@ -156,6 +182,139 @@ func (c *Client) GetArchive(id *charm.Reference) (r io.ReadCloser, eid *charm.Re
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
+// ListResources retrieves the metadata about resources for the given charm.
+func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
+	// Prepare the request.
+	urls := make([]string, len(ids))
+	for i, id := range ids {
+		urls[i] = id.WithRevision(-1).String()
+	}
+	values := url.Values{
+		"id": urls,
+	}
+	path := "/meta/resources?" + values.Encode()
+
+	// Send the request.
+	var results map[string][]params.Resource
+	if err := c.Get(path, &results); err != nil {
+		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
+	}
+	return results, nil
+}
+
+// UploadResource uploads the bytes for a resource.
+func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSeeker) (revision int, err error) {
+	hash, size, err := readerHashAndSize(file)
+	if err != nil {
+		return -1, errgo.Mask(err)
+	}
+
+	// Prepare the request.
+	req, err := http.NewRequest("PUT", "", nil)
+	if err != nil {
+		return -1, errgo.Notef(err, "cannot make new request")
+	}
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = size
+
+	hash = url.QueryEscape(hash)
+	path = url.QueryEscape(path)
+
+	url := fmt.Sprintf("/%s/resources/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
+
+	// Send the request.
+	resp, err := c.DoWithBody(req, url, file)
+	if err != nil {
+		return -1, errgo.NoteMask(err, "cannot post resource", errgo.Any)
+	}
+	defer resp.Body.Close()
+
+	// Parse the response.
+	var result params.ResourceUploadResponse
+	if err := parseResponseBody(resp.Body, &result); err != nil {
+		return -1, errgo.Mask(err)
+	}
+	return result.Revision, nil
+}
+
+// Publish tells the charmstore to mark the given charm as published with the
+// given resource revisions to the given channels.
+func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map[string]int) error {
+	if len(channels) == 0 {
+		return nil
+	}
+	val := &params.PublishRequest{
+		Resources: resources,
+		Channels:  channels,
+	}
+	if err := s.Put("/"+id.Path()+"/publish", val); err != nil {
+		return errgo.Mask(err)
+	}
+	return nil
+}
+
+// ResourceData holds information about a resource.
+// It must be closed after use.
+type ResourceData struct {
+	io.ReadCloser
+	Revision int
+	Hash     string
+	Size     int64
+}
+
+// GetResource retrieves byes of the resource with the given name and revision
+// for the given charm, returning a reader its data can be read from,  the
+// SHA384 hash of the data and its size.  If revision is -1, the latest revision
+// of the resource will be retrieved.
+//
+// Note that the result must be closed after use.
+func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
+	// Create the request.
+	req, err := http.NewRequest("GET", "", nil)
+	if err != nil {
+		return result, errgo.Notef(err, "cannot make new request")
+	}
+
+	url := "/" + id.Path() + "/resource/" + name
+	if revision >= 0 {
+		url += "/" + strconv.Itoa(revision)
+	}
+	resp, err := c.Do(req, url)
+	if err != nil {
+		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)
+	}
+	defer func() {
+		if err != nil {
+			resp.Body.Close()
+		}
+	}()
+
+	// Validate the response headers.
+	revisionStr := resp.Header.Get(params.ResourceRevisionHeader)
+	if revisionStr == "" {
+		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
+	}
+	revision, err = strconv.Atoi(revisionStr)
+	if err != nil {
+		return result, errgo.Notef(err, "invalid resource revision found in response")
+	}
+	hash := resp.Header.Get(params.ContentHashHeader)
+	if hash == "" {
+		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
+	}
+
+	// Validate the response contents.
+	if resp.ContentLength < 0 {
+		return result, errgo.Newf("no content length found in response")
+	}
+	return ResourceData{
+		ReadCloser: resp.Body,
+		Revision:   revision,
+		Hash:       hash,
+		Size:       resp.ContentLength,
+	}, nil
+}
+
 // StatsUpdate updates the download stats for the given id and specific time.
 func (c *Client) StatsUpdate(req params.StatsUpdateRequest) error {
 	return c.Put("/stats/update", req)
@@ -168,7 +327,7 @@ func (c *Client) StatsUpdate(req params.StatsUpdateRequest) error {
 //
 // UploadCharm returns the id that the charm has been given in the
 // store - this will be the same as id except the revision.
-func (c *Client) UploadCharm(id *charm.Reference, ch charm.Charm) (*charm.Reference, error) {
+func (c *Client) UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error) {
 	if id.Revision != -1 {
 		return nil, errgo.Newf("revision specified in %q, but should not be specified", id)
 	}
@@ -187,7 +346,7 @@ func (c *Client) UploadCharm(id *charm.Reference, ch charm.Charm) (*charm.Refere
 //
 // This method is provided only for testing and should not
 // generally be used otherwise.
-func (c *Client) UploadCharmWithRevision(id *charm.Reference, ch charm.Charm, promulgatedRevision int) error {
+func (c *Client) UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulgatedRevision int) error {
 	if id.Revision == -1 {
 		return errgo.Newf("revision not specified in %q", id)
 	}
@@ -207,7 +366,7 @@ func (c *Client) UploadCharmWithRevision(id *charm.Reference, ch charm.Charm, pr
 //
 // UploadBundle returns the id that the bundle has been given in the
 // store - this will be the same as id except the revision.
-func (c *Client) UploadBundle(id *charm.Reference, b charm.Bundle) (*charm.Reference, error) {
+func (c *Client) UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error) {
 	if id.Revision != -1 {
 		return nil, errgo.Newf("revision specified in %q, but should not be specified", id)
 	}
@@ -226,7 +385,7 @@ func (c *Client) UploadBundle(id *charm.Reference, b charm.Bundle) (*charm.Refer
 //
 // This method is provided only for testing and should not
 // generally be used otherwise.
-func (c *Client) UploadBundleWithRevision(id *charm.Reference, b charm.Bundle, promulgatedRevision int) error {
+func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulgatedRevision int) error {
 	if id.Revision == -1 {
 		return errgo.Newf("revision not specified in %q", id)
 	}
@@ -240,10 +399,10 @@ func (c *Client) UploadBundleWithRevision(id *charm.Reference, b charm.Bundle, p
 }
 
 // uploadArchive pushes the archive for the charm or bundle represented by
-// the given body, its SHA384 hash and its size. It returns the resulting
-// entity reference. The given id should include the series and should not
-// include the revision.
-func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.Reference, error) {
+// the given body, its hex-encoded SHA384 hash and its size. It returns
+// the resulting entity reference. The given id should include the series
+// and should not include the revision.
+func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
 	// When uploading archives, it can be a problem that the
 	// an error response is returned while we are still writing
 	// the body data.
@@ -259,10 +418,6 @@ func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash str
 		if err := c.Login(); err != nil {
 			return nil, errgo.Notef(err, "cannot log in")
 		}
-	}
-	// Validate the entity id.
-	if id.Series == "" {
-		return nil, errgo.Newf("no series specified in %q", id)
 	}
 	method := "POST"
 	promulgatedArg := ""
@@ -307,8 +462,16 @@ func (c *Client) uploadArchive(id *charm.Reference, body io.ReadSeeker, hash str
 // Each entry in the info map causes a value in extra-info with
 // that key to be set to the associated value.
 // Entries not set in the map will be unchanged.
-func (c *Client) PutExtraInfo(id *charm.Reference, info map[string]interface{}) error {
+func (c *Client) PutExtraInfo(id *charm.URL, info map[string]interface{}) error {
 	return c.Put("/"+id.Path()+"/meta/extra-info", info)
+}
+
+// PutCommonInfo puts common-info data for the given id.
+// Each entry in the info map causes a value in common-info with
+// that key to be set to the associated value.
+// Entries not set in the map will be unchanged.
+func (c *Client) PutCommonInfo(id *charm.URL, info map[string]interface{}) error {
+	return c.Put("/"+id.Path()+"/meta/common-info", info)
 }
 
 // Meta fetches metadata on the charm or bundle with the
@@ -337,7 +500,7 @@ func (c *Client) PutExtraInfo(id *charm.Reference, info map[string]interface{}) 
 //		Digest string `csclient:"extra-info/digest"`
 //	}
 //	id, err := client.Meta(id, &result)
-func (c *Client) Meta(id *charm.Reference, result interface{}) (*charm.Reference, error) {
+func (c *Client) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
 	if result == nil {
 		return nil, fmt.Errorf("expected valid result pointer, not nil")
 	}
@@ -387,7 +550,7 @@ func (c *Client) Meta(id *charm.Reference, result interface{}) (*charm.Reference
 	// but we want to keep them raw so that we can unmarshal
 	// them ourselves.
 	var rawResult struct {
-		Id   *charm.Reference
+		Id   *charm.URL
 		Meta map[string]json.RawMessage
 	}
 	path := "/" + id.Path() + "/meta/any"
@@ -460,10 +623,20 @@ func (c *Client) Get(path string, result interface{}) error {
 	return nil
 }
 
-// Put makes a PUT request to the given path in the charm store (not
-// including the host name or version prefix, but including a leading
-// /), marshaling the given value as JSON to use as the request body.
+// Put makes a PUT request to the given path in the charm store
+// (not including the host name or version prefix, but including a leading /),
+// marshaling the given value as JSON to use as the request body.
 func (c *Client) Put(path string, val interface{}) error {
+	return c.PutWithResponse(path, val, nil)
+}
+
+// PutWithResponse makes a PUT request to the given path in the charm store
+// (not including the host name or version prefix, but including a leading /),
+// marshaling the given value as JSON to use as the request body. Additionally,
+// this method parses the result as JSON into the given result value, which
+// should be a pointer to the expected data, but may be nil if no result is
+// desired.
+func (c *Client) PutWithResponse(path string, val, result interface{}) error {
 	req, _ := http.NewRequest("PUT", "", nil)
 	req.Header.Set("Content-Type", "application/json")
 	data, err := json.Marshal(val)
@@ -475,7 +648,11 @@ func (c *Client) Put(path string, val interface{}) error {
 	if err != nil {
 		return errgo.Mask(err, errgo.Any)
 	}
-	resp.Body.Close()
+	defer resp.Body.Close()
+	// Parse the response.
+	if err := parseResponseBody(resp.Body, result); err != nil {
+		return errgo.Mask(err)
+	}
 	return nil
 }
 
@@ -516,6 +693,11 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	u, err := url.Parse(c.params.URL + "/" + apiVersion + path)
 	if err != nil {
 		return nil, errgo.Mask(err)
+	}
+	if c.channel != params.NoChannel {
+		values := u.Query()
+		values.Set("channel", string(c.channel))
+		u.RawQuery = values.Encode()
 	}
 	req.URL = u
 
@@ -574,7 +756,7 @@ func sizeLimit(data []byte) []byte {
 }
 
 // Log sends a log message to the charmstore's log database.
-func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.Reference) error {
+func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string, urls ...*charm.URL) error {
 	b, err := json.Marshal(message)
 	if err != nil {
 		return errgo.Notef(err, "cannot marshal log message")
@@ -626,3 +808,61 @@ func (cs *Client) WhoAmI() (*params.WhoAmIResponse, error) {
 	}
 	return &response, nil
 }
+
+// Latest returns the most current revision for each of the identified
+// charms. The revision in the provided charm URLs is ignored.
+func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
+	if len(curls) == 0 {
+		return nil, nil
+	}
+
+	// Prepare the request to the charm store.
+	urls := make([]string, len(curls))
+	values := url.Values{}
+	// Include the ignore-auth flag so that non-public results do not generate
+	// an error for the whole request.
+	values.Add("ignore-auth", "1")
+	values.Add("include", "id-revision")
+	values.Add("include", "hash256")
+	for i, curl := range curls {
+		url := curl.WithRevision(-1).String()
+		urls[i] = url
+		values.Add("id", url)
+	}
+	u := url.URL{
+		Path:     "/meta/any",
+		RawQuery: values.Encode(),
+	}
+
+	// Execute the request and retrieve results.
+	var results map[string]struct {
+		Meta struct {
+			IdRevision params.IdRevisionResponse `json:"id-revision"`
+			Hash256    params.HashResponse       `json:"hash256"`
+		}
+	}
+	if err := cs.Get(u.String(), &results); err != nil {
+		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
+	}
+
+	// Build the response.
+	responses := make([]params.CharmRevision, len(curls))
+	for i, url := range urls {
+		result, found := results[url]
+		if !found {
+			responses[i] = params.CharmRevision{
+				Err: params.ErrNotFound,
+			}
+			continue
+		}
+		responses[i] = params.CharmRevision{
+			Revision: result.Meta.IdRevision.Revision,
+			Sha256:   result.Meta.Hash256.Sum,
+		}
+	}
+	return responses, nil
+}
+
+// JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
+// attributes to the charm store.
+const JujuMetadataHTTPHeader = "Juju-Metadata"

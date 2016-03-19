@@ -8,9 +8,9 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 
-	"gopkg.in/juju/charmrepo.v1"
-	"gopkg.in/juju/charmrepo.v1/csclient"
-	charmtesting "gopkg.in/juju/charmrepo.v1/testing"
+	"gopkg.in/juju/charmrepo.v2-unstable"
+	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
+	charmtesting "gopkg.in/juju/charmrepo.v2-unstable/testing"
 )
 
 var TestCharms = charmtesting.NewRepo("internal/test-charm-repo", "quantal")
@@ -36,7 +36,7 @@ var inferRepositoryTests = []struct {
 func (s *inferRepoSuite) TestInferRepository(c *gc.C) {
 	for i, test := range inferRepositoryTests {
 		c.Logf("test %d: %s", i, test.url)
-		ref := charm.MustParseReference(test.url)
+		ref := charm.MustParseURL(test.url)
 		repo, err := charmrepo.InferRepository(
 			ref, charmrepo.NewCharmStoreParams{}, test.localRepoPath)
 		if test.err != "" {
