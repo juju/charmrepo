@@ -11,6 +11,8 @@ import (
 	"fmt"
 	"io"
 	"io/ioutil"
+	"mime"
+	"mime/multipart"
 	"net/http"
 	"net/url"
 	"reflect"
@@ -257,9 +259,7 @@ func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 // It must be closed after use.
 type ResourceData struct {
 	io.ReadCloser
-	Revision int
-	Hash     string
-	Size     int64
+	Resource params.Resource
 }
 
 // GetResource retrieves byes of the resource with the given name and revision
@@ -269,7 +269,6 @@ type ResourceData struct {
 //
 // Note that the result must be closed after use.
 func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
-	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		return result, errgo.Notef(err, "cannot make new request")
@@ -289,29 +288,32 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 		}
 	}()
 
-	// Validate the response headers.
-	revisionStr := resp.Header.Get(params.ResourceRevisionHeader)
-	if revisionStr == "" {
-		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
-	}
-	revision, err = strconv.Atoi(revisionStr)
+	mediaType, vals, err := mime.ParseMediaType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		return result, errgo.Notef(err, "invalid resource revision found in response")
+		return result, errgo.NoteMask(err, "cannot parse Content-Type", errgo.Any)
 	}
-	hash := resp.Header.Get(params.ContentHashHeader)
-	if hash == "" {
-		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
+	if !strings.HasPrefix(mediaType, "multipart/") {
+		return result, errgo.Newf("expected multipart body, but got %q", mediaType)
+	}
+	mr := multipart.NewReader(resp.Body, vals["boundary"])
+	part, err := mr.NextPart()
+	if err != nil {
+		return result, errgo.NoteMask(err, "cannot read metadata from response", errgo.Any)
 	}
 
-	// Validate the response contents.
-	if resp.ContentLength < 0 {
-		return result, errgo.Newf("no content length found in response")
+	dec := json.NewDecoder(part)
+	var resource params.Resource
+	if err := dec.Decode(&resource); err != nil {
+		return result, errgo.NoteMask(err, "cannot unmarshal resource", errgo.Any)
+	}
+
+	data, err := mr.NextPart()
+	if err != nil {
+		return result, errgo.NoteMask(err, "cannot read resource data from response", errgo.Any)
 	}
 	return ResourceData{
-		ReadCloser: resp.Body,
-		Revision:   revision,
-		Hash:       hash,
-		Size:       resp.ContentLength,
+		ReadCloser: data,
+		Resource:   resource,
 	}, nil
 }
 
@@ -657,16 +659,18 @@ func (c *Client) PutWithResponse(path string, val, result interface{}) error {
 }
 
 func parseResponseBody(body io.Reader, result interface{}) error {
-	data, err := ioutil.ReadAll(body)
-	if err != nil {
-		return errgo.Notef(err, "cannot read response body")
-	}
 	if result == nil {
 		// The caller doesn't care about the response body.
+		if _, err := io.Copy(ioutil.Discard, body); err != nil {
+			return errgo.Notef(err, "cannot read response body")
+		}
 		return nil
 	}
-	if err := json.Unmarshal(data, result); err != nil {
-		return errgo.Notef(err, "cannot unmarshal response %q", sizeLimit(data))
+	lw := limitWriter{&bytes.Buffer{}}
+	r := io.TeeReader(body, lw)
+	dec := json.NewDecoder(r)
+	if err := dec.Decode(result); err != nil {
+		return errgo.Notef(err, "cannot unmarshal response %q", lw.buf)
 	}
 	return nil
 }
@@ -712,17 +716,16 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	}
 	defer resp.Body.Close()
 
-	// Parse the response error.
-	data, err := ioutil.ReadAll(resp.Body)
-	if err != nil {
-		return nil, errgo.Notef(err, "cannot read response body")
-	}
+	lw := limitWriter{&bytes.Buffer{}}
+	r := io.TeeReader(resp.Body, lw)
+	dec := json.NewDecoder(r)
 	var perr params.Error
-	if err := json.Unmarshal(data, &perr); err != nil {
-		return nil, errgo.Notef(err, "cannot unmarshal error response %q", sizeLimit(data))
+	// Parse the response error.
+	if err := dec.Decode(&perr); err != nil {
+		return nil, errgo.Notef(err, "cannot unmarshal error response %q", lw.buf)
 	}
 	if perr.Message == "" {
-		return nil, errgo.Newf("error response with empty message %s", sizeLimit(data))
+		return nil, errgo.Newf("error response with empty message %s", lw.buf)
 	}
 	return nil, &perr
 }
@@ -747,12 +750,17 @@ func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
 	return c.DoWithBody(req, path, nil)
 }
 
-func sizeLimit(data []byte) []byte {
-	const max = 1024
-	if len(data) < max {
-		return data
+// limitWriter implements a writer that will only accept 1024 bytes.
+type limitWriter struct {
+	buf *bytes.Buffer
+}
+
+func (l limitWriter) Write(p []byte) (n int, err error) {
+	length := 1024 - l.buf.Len()
+	if length > len(p) {
+		length = len(p)
 	}
-	return append(data[0:max], fmt.Sprintf(" ... [%d bytes omitted]", len(data)-max)...)
+	return l.buf.Write(p[:length])
 }
 
 // Log sends a log message to the charmstore's log database.

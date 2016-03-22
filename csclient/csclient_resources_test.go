@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"io"
 	"io/ioutil"
+	"mime/multipart"
 	"net/http"
 	"strings"
 
@@ -100,16 +101,37 @@ func (ResourceSuite) TestGetResource(c *gc.C) {
 	data := []byte("boo!")
 	fp, err := resource.GenerateFingerprint(bytes.NewReader(data))
 	c.Assert(err, jc.ErrorIsNil)
-	body := ioutil.NopCloser(bytes.NewReader(data))
+	res := params.Resource{
+		Name:        "name",
+		Type:        "file",
+		Path:        "foo.tgz",
+		Description: "foobar",
+		Origin:      "store",
+		Revision:    5,
+		Fingerprint: fp.Bytes(),
+	}
+
+	b := &bytes.Buffer{}
+	multi := multipart.NewWriter(b)
+	resBytes, err := json.Marshal(res)
+	c.Assert(err, jc.ErrorIsNil)
+	w, err := multi.CreatePart(nil)
+	c.Assert(err, jc.ErrorIsNil)
+	_, err = w.Write(resBytes)
+	c.Assert(err, jc.ErrorIsNil)
+	w, err = multi.CreateFormFile("data", "foo.tgz")
+	c.Assert(err, jc.ErrorIsNil)
+	_, err = w.Write(data)
+	err = multi.Close()
+	c.Assert(err, jc.ErrorIsNil)
 
 	resp := &http.Response{
 		StatusCode: 200,
-		Body:       body,
+		Body:       ioutil.NopCloser(bytes.NewReader(b.Bytes())),
 		Header: http.Header{
-			params.ResourceRevisionHeader: []string{"1"},
-			params.ContentHashHeader:      []string{fp.String()},
+			"Content-Type": []string{multi.FormDataContentType()},
 		},
-		ContentLength: int64(len(data)),
+		ContentLength: int64(b.Len()),
 	}
 
 	f := &fakeClient{
@@ -121,12 +143,10 @@ func (ResourceSuite) TestGetResource(c *gc.C) {
 	id := charm.MustParseURL("cs:quantal/starsay")
 	resdata, err := client.GetResource(id, 1, "data")
 	c.Assert(err, jc.ErrorIsNil)
-	c.Check(resdata, gc.DeepEquals, ResourceData{
-		ReadCloser: body,
-		Revision:   1,
-		Hash:       fp.String(),
-		Size:       int64(len(data)),
-	})
+	c.Check(resdata.Resource, gc.DeepEquals, res)
+	bytes, err := ioutil.ReadAll(resdata.ReadCloser)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(bytes, gc.DeepEquals, data)
 }
 
 type fakeClient struct {
