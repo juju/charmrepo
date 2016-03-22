@@ -914,7 +914,7 @@ var getWithBadResponseTests = []struct {
 		Body:          ioutil.NopCloser(&errorReader{"body read error"}),
 		ContentLength: -1,
 	},
-	expectError: "cannot read response body: body read error",
+	expectError: `cannot unmarshal response "": body read error`,
 }, {
 	about: "badly formatted json response",
 	response: &http.Response{
