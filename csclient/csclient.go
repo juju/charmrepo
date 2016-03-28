@@ -257,9 +257,8 @@ func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 // It must be closed after use.
 type ResourceData struct {
 	io.ReadCloser
-	Revision int
-	Hash     string
-	Size     int64
+	Hash string
+	Size int64
 }
 
 // GetResource retrieves byes of the resource with the given name and revision
@@ -290,14 +289,6 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 	}()
 
 	// Validate the response headers.
-	revisionStr := resp.Header.Get(params.ResourceRevisionHeader)
-	if revisionStr == "" {
-		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
-	}
-	revision, err = strconv.Atoi(revisionStr)
-	if err != nil {
-		return result, errgo.Notef(err, "invalid resource revision found in response")
-	}
 	hash := resp.Header.Get(params.ContentHashHeader)
 	if hash == "" {
 		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
@@ -309,7 +300,6 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 	}
 	return ResourceData{
 		ReadCloser: resp.Body,
-		Revision:   revision,
 		Hash:       hash,
 		Size:       resp.ContentLength,
 	}, nil
