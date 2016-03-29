@@ -14,7 +14,6 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
-	"strconv"
 	"strings"
 	"unicode"
 
@@ -190,7 +189,8 @@ func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, 
 		urls[i] = id.WithRevision(-1).String()
 	}
 	values := url.Values{
-		"id": urls,
+		"id":          urls,
+		"ignore-auth": []string{"1"},
 	}
 	path := "/meta/resources?" + values.Encode()
 
@@ -257,28 +257,26 @@ func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 // It must be closed after use.
 type ResourceData struct {
 	io.ReadCloser
-	Revision int
-	Hash     string
-	Size     int64
+	Hash string
+	Size int64
 }
 
 // GetResource retrieves byes of the resource with the given name and revision
 // for the given charm, returning a reader its data can be read from,  the
-// SHA384 hash of the data and its size.  If revision is -1, the latest revision
-// of the resource will be retrieved.
+// SHA384 hash of the data and its size.
 //
 // Note that the result must be closed after use.
-func (c *Client) GetResource(id *charm.URL, revision int, name string) (result ResourceData, err error) {
+func (c *Client) GetResource(id *charm.URL, name string, revision int) (result ResourceData, err error) {
+	if revision < 0 {
+		return result, errgo.New("revision must be a non-negative integer")
+	}
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
 		return result, errgo.Notef(err, "cannot make new request")
 	}
 
-	url := "/" + id.Path() + "/resource/" + name
-	if revision >= 0 {
-		url += "/" + strconv.Itoa(revision)
-	}
+	url := fmt.Sprintf("/%s/resource/%s/%d", id.Path(), name, revision)
 	resp, err := c.Do(req, url)
 	if err != nil {
 		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)
@@ -290,14 +288,6 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 	}()
 
 	// Validate the response headers.
-	revisionStr := resp.Header.Get(params.ResourceRevisionHeader)
-	if revisionStr == "" {
-		return result, errgo.Newf("no %s header found in response", params.ResourceRevisionHeader)
-	}
-	revision, err = strconv.Atoi(revisionStr)
-	if err != nil {
-		return result, errgo.Notef(err, "invalid resource revision found in response")
-	}
 	hash := resp.Header.Get(params.ContentHashHeader)
 	if hash == "" {
 		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
@@ -309,10 +299,20 @@ func (c *Client) GetResource(id *charm.URL, revision int, name string) (result R
 	}
 	return ResourceData{
 		ReadCloser: resp.Body,
-		Revision:   revision,
 		Hash:       hash,
 		Size:       resp.ContentLength,
 	}, nil
+}
+
+// ResourceMeta returns the metadata for the resource on charm id with the
+// given name and revision.
+func (c *Client) ResourceMeta(id *charm.URL, name string, revision int) (params.Resource, error) {
+	path := fmt.Sprintf("/%s/meta/resource/%s/%d", id.Path(), name, revision)
+	var result params.Resource
+	if err := c.Get(path, &result); err != nil {
+		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), errgo.Any)
+	}
+	return result, nil
 }
 
 // StatsUpdate updates the download stats for the given id and specific time.
