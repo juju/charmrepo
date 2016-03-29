@@ -189,7 +189,8 @@ func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, 
 		urls[i] = id.WithRevision(-1).String()
 	}
 	values := url.Values{
-		"id": urls,
+		"id":          urls,
+		"ignore-auth": []string{"1"},
 	}
 	path := "/meta/resources?" + values.Encode()
 
