@@ -185,6 +185,14 @@ func (s *LegacyCharmStore) Event(curl *charm.URL, digest string) (*EventResponse
 	return event, nil
 }
 
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Sha256   string
+	Err      error
+}
+
 // revisions returns the revisions of the charms referenced by curls.
 func (s *LegacyCharmStore) revisions(curls ...charm.Location) (revisions []CharmRevision, err error) {
 	infos, err := s.Info(curls...)

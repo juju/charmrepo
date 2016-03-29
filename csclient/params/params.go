@@ -330,6 +330,14 @@ type ResourceUploadResponse struct {
 	Revision int
 }
 
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Sha256   string
+	Err      error
+}
+
 const (
 	// BzrDigestKey is the extra-info key used to store the Bazaar digest
 	BzrDigestKey = "bzr-digest"

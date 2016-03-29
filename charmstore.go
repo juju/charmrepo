@@ -210,59 +210,6 @@ func verifyHash384AndSize(path, expectHash string, expectSize int64) error {
 	return nil
 }
 
-// Latest implements Interface.Latest.
-func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
-	if len(curls) == 0 {
-		return nil, nil
-	}
-
-	// Prepare the request to the charm store.
-	urls := make([]string, len(curls))
-	values := url.Values{}
-	// Include the ignore-auth flag so that non-public results do not generate
-	// an error for the whole request.
-	values.Add("ignore-auth", "1")
-	values.Add("include", "id-revision")
-	values.Add("include", "hash256")
-	for i, curl := range curls {
-		url := curl.WithRevision(-1).String()
-		urls[i] = url
-		values.Add("id", url)
-	}
-	u := url.URL{
-		Path:     "/meta/any",
-		RawQuery: values.Encode(),
-	}
-
-	// Execute the request and retrieve results.
-	var results map[string]struct {
-		Meta struct {
-			IdRevision params.IdRevisionResponse `json:"id-revision"`
-			Hash256    params.HashResponse       `json:"hash256"`
-		}
-	}
-	if err := s.client.Get(u.String(), &results); err != nil {
-		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
-	}
-
-	// Build the response.
-	responses := make([]CharmRevision, len(curls))
-	for i, url := range urls {
-		result, found := results[url]
-		if !found {
-			responses[i] = CharmRevision{
-				Err: CharmNotFound(url),
-			}
-			continue
-		}
-		responses[i] = CharmRevision{
-			Revision: result.Meta.IdRevision.Revision,
-			Sha256:   result.Meta.Hash256.Sum,
-		}
-	}
-	return responses, nil
-}
-
 // Resolve implements Interface.Resolve.
 func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 	var result struct {
@@ -284,34 +231,4 @@ func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 		return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
 	return result.Id.Id, result.SupportedSeries.SupportedSeries, nil
-}
-
-// URL returns the root endpoint URL of the charm store.
-func (s *CharmStore) URL() string {
-	return s.client.ServerURL()
-}
-
-// WithTestMode returns a repository Interface where test mode is enabled,
-// meaning charm store download stats are not increased when charms are
-// retrieved.
-func (s *CharmStore) WithTestMode() *CharmStore {
-	newRepo := *s
-	newRepo.client.DisableStats()
-	return &newRepo
-}
-
-// JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
-// attributes to the charm store.
-const JujuMetadataHTTPHeader = "Juju-Metadata"
-
-// WithJujuAttrs returns a repository Interface with the Juju metadata
-// attributes set.
-func (s *CharmStore) WithJujuAttrs(attrs map[string]string) *CharmStore {
-	newRepo := *s
-	header := make(http.Header)
-	for k, v := range attrs {
-		header.Add(JujuMetadataHTTPHeader, k+"="+v)
-	}
-	newRepo.client.SetHTTPHeader(header)
-	return &newRepo
 }

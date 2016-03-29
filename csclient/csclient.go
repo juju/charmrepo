@@ -808,3 +808,61 @@ func (cs *Client) WhoAmI() (*params.WhoAmIResponse, error) {
 	}
 	return &response, nil
 }
+
+// Latest returns the most current revision for each of the identified
+// charms. The revision in the provided charm URLs is ignored.
+func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
+	if len(curls) == 0 {
+		return nil, nil
+	}
+
+	// Prepare the request to the charm store.
+	urls := make([]string, len(curls))
+	values := url.Values{}
+	// Include the ignore-auth flag so that non-public results do not generate
+	// an error for the whole request.
+	values.Add("ignore-auth", "1")
+	values.Add("include", "id-revision")
+	values.Add("include", "hash256")
+	for i, curl := range curls {
+		url := curl.WithRevision(-1).String()
+		urls[i] = url
+		values.Add("id", url)
+	}
+	u := url.URL{
+		Path:     "/meta/any",
+		RawQuery: values.Encode(),
+	}
+
+	// Execute the request and retrieve results.
+	var results map[string]struct {
+		Meta struct {
+			IdRevision params.IdRevisionResponse `json:"id-revision"`
+			Hash256    params.HashResponse       `json:"hash256"`
+		}
+	}
+	if err := cs.Get(u.String(), &results); err != nil {
+		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
+	}
+
+	// Build the response.
+	responses := make([]params.CharmRevision, len(curls))
+	for i, url := range urls {
+		result, found := results[url]
+		if !found {
+			responses[i] = params.CharmRevision{
+				Err: params.ErrNotFound,
+			}
+			continue
+		}
+		responses[i] = params.CharmRevision{
+			Revision: result.Meta.IdRevision.Revision,
+			Sha256:   result.Meta.Hash256.Sum,
+		}
+	}
+	return responses, nil
+}
+
+// JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
+// attributes to the charm store.
+const JujuMetadataHTTPHeader = "Juju-Metadata"
