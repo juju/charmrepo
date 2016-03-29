@@ -106,8 +106,7 @@ func (ResourceSuite) TestGetResource(c *gc.C) {
 		StatusCode: 200,
 		Body:       body,
 		Header: http.Header{
-			params.ResourceRevisionHeader: []string{"1"},
-			params.ContentHashHeader:      []string{fp.String()},
+			params.ContentHashHeader: []string{fp.String()},
 		},
 		ContentLength: int64(len(data)),
 	}
@@ -119,14 +118,46 @@ func (ResourceSuite) TestGetResource(c *gc.C) {
 
 	client := Client{bclient: f}
 	id := charm.MustParseURL("cs:quantal/starsay")
-	resdata, err := client.GetResource(id, 1, "data")
+	resdata, err := client.GetResource(id, "data", 1)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Check(resdata, gc.DeepEquals, ResourceData{
 		ReadCloser: body,
-		Revision:   1,
 		Hash:       fp.String(),
 		Size:       int64(len(data)),
 	})
+}
+
+func (ResourceSuite) TestResourceMeta(c *gc.C) {
+	data := "somedata"
+	fp, err := resource.GenerateFingerprint(strings.NewReader(data))
+	c.Assert(err, jc.ErrorIsNil)
+	result := params.Resource{
+		Name:        "data",
+		Type:        "file",
+		Origin:      "store",
+		Path:        "data.zip",
+		Description: "some zip file",
+		Revision:    1,
+		Fingerprint: fp.Bytes(),
+		Size:        int64(len(data)),
+	}
+
+	b, err := json.Marshal(result)
+	c.Assert(err, jc.ErrorIsNil)
+
+	f := &fakeClient{
+		Stub: &testing.Stub{},
+		ReturnDoWithBody: &http.Response{
+			StatusCode: 200,
+			Body:       ioutil.NopCloser(bytes.NewReader(b)),
+		},
+	}
+
+	client := Client{bclient: f}
+	id := charm.MustParseURL("cs:quantal/starsay")
+	resdata, err := client.ResourceMeta(id, "data", 1)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(resdata, gc.DeepEquals, result)
 }
 
 type fakeClient struct {
