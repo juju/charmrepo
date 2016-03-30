@@ -20,6 +20,7 @@ import (
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 )
@@ -73,6 +74,10 @@ type Params struct {
 	// If nil, no interaction will be allowed. This field
 	// is ignored if BakeryClient is provided.
 	VisitWebPage func(url *url.URL) error
+
+	// Auth holds a list of macaroons that will be added to the cookie jar of
+	// the HTTP Client that is used by this client.
+	Auth macaroon.Slice
 }
 
 type httpClient interface {
@@ -92,6 +97,15 @@ func New(p Params) *Client {
 		bclient = &httpbakery.Client{
 			Client:       p.HTTPClient,
 			VisitWebPage: p.VisitWebPage,
+		}
+	}
+	if len(p.Auth) > 0 {
+		url, err := url.Parse(p.URL)
+		// A non-nil error here will get caught at request time when we try
+		// to parse the URL, and without a valid URL, the macaroons don't matter
+		// anyway.
+		if err == nil {
+			httpbakery.SetCookie(bclient.Jar, url, p.Auth)
 		}
 	}
 	return &Client{

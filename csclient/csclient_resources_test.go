@@ -9,6 +9,7 @@ import (
 	"io"
 	"io/ioutil"
 	"net/http"
+	"net/url"
 	"strings"
 
 	"github.com/juju/testing"
@@ -16,6 +17,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
 	"gopkg.in/juju/charm.v6-unstable/resource"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon.v1"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 )
@@ -158,6 +161,26 @@ func (ResourceSuite) TestResourceMeta(c *gc.C) {
 	resdata, err := client.ResourceMeta(id, "data", 1)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(resdata, gc.DeepEquals, result)
+}
+
+type InternalSuite struct{}
+
+var _ = gc.Suite(InternalSuite{})
+
+func (s InternalSuite) TestMacaroon(c *gc.C) {
+	var m macaroon.Macaroon
+	macs := macaroon.Slice{&m}
+	client := New(Params{
+		URL:  "https://foo.com",
+		Auth: macs,
+	})
+	u, err := url.Parse("https://foo.com")
+	c.Assert(err, jc.ErrorIsNil)
+	bc := client.bclient.(*httpbakery.Client)
+	cookies := bc.Jar.Cookies(u)
+	expected, err := httpbakery.NewCookie(macs)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(cookies, gc.DeepEquals, []*http.Cookie{expected})
 }
 
 type fakeClient struct {
