@@ -803,12 +803,13 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 	return nil
 }
 
-// Login explicitly obtains authorization credentials
-// for the charm store and stores them in the client's
-// cookie jar.
+// Login explicitly obtains authorization credentials for the charm store
+// and stores them in the client's cookie jar. If there was an error
+// perfoming a login interaction then the error will have a cause of type
+// *httpbakery.InteractionError.
 func (cs *Client) Login() error {
 	if err := cs.Get("/delegatable-macaroon", &struct{}{}); err != nil {
-		return errgo.Notef(err, "cannot retrieve the authentication macaroon")
+		return errgo.NoteMask(err, "cannot retrieve the authentication macaroon", httpbakery.IsInteractionError)
 	}
 	return nil
 }
