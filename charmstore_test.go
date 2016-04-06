@@ -141,16 +141,35 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	return b, id
 }
 
-func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL) {
-	// Publish to stable.
+func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL, channels ...params.Channel) {
+	if len(channels) == 0 {
+		channels = []params.Channel{
+			params.StableChannel,
+			params.DevelopmentChannel,
+			params.UnpublishedChannel,
+		}
+	}
+	unpublished := false
+	for i, channel := range channels {
+		if channel == params.UnpublishedChannel {
+			unpublished = true
+			channels = append(channels[:i], channels[i+1:]...)
+			break
+		}
+	}
 	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
-		Channels: []params.Channel{params.StableChannel},
+		Channels: channels,
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Allow read permissions to everyone.
-	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	if unpublished {
+		channels = append(channels, params.UnpublishedChannel)
+	}
+	for _, channel := range channels {
+		// Allow read permissions to everyone.
+		err = s.client.WithChannel(channel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+		c.Assert(err, jc.ErrorIsNil)
+	}
 }
 
 type charmStoreRepoSuite struct {
