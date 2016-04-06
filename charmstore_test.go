@@ -98,7 +98,7 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 	return ch, id
 }
 
@@ -115,7 +115,7 @@ func (s *charmStoreBaseSuite) addCharmNoRevision(c *gc.C, urlStr, name string) (
 	url, err := s.client.UploadCharm(id, ch)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 
 	return ch, url
 }
@@ -135,39 +135,25 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	err := s.client.UploadBundleWithRevision(id, b, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 
 	// Return the bundle and its URL.
 	return b, id
 }
 
 func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL, channels ...params.Channel) {
-	if len(channels) == 0 {
-		channels = []params.Channel{
-			params.StableChannel,
-			params.DevelopmentChannel,
-			params.UnpublishedChannel,
-		}
+	if len(channels) > 0 {
+		err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+			Channels: channels,
+		})
+		c.Assert(err, jc.ErrorIsNil)
+	} else {
+		channels = []params.Channel{params.UnpublishedChannel}
 	}
-	unpublished := false
-	for i, channel := range channels {
-		if channel == params.UnpublishedChannel {
-			unpublished = true
-			channels = append(channels[:i], channels[i+1:]...)
-			break
-		}
-	}
-	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
-		Channels: channels,
-	})
-	c.Assert(err, jc.ErrorIsNil)
 
-	if unpublished {
-		channels = append(channels, params.UnpublishedChannel)
-	}
 	for _, channel := range channels {
 		// Allow read permissions to everyone.
-		err = s.client.WithChannel(channel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+		err := s.client.WithChannel(channel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
 		c.Assert(err, jc.ErrorIsNil)
 	}
 }
