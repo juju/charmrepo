@@ -133,6 +133,11 @@ func (c *Client) WithChannel(channel params.Channel) *Client {
 	return &client
 }
 
+// Channel returns the currently set channel.
+func (c *Client) Channel() params.Channel {
+	return c.channel
+}
+
 // SetHTTPHeader sets custom HTTP headers that will be sent to the charm store
 // on each request.
 func (c *Client) SetHTTPHeader(header http.Header) {
