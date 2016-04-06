@@ -385,10 +385,8 @@ func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
 }
 
 var resolveTests = []struct {
-	id  string
-	url string
-	//clientChannel   params.Channel
-	//published       []params.PublishedInfo
+	id              string
+	url             string
 	supportedSeries []string
 	err             string
 }{{
@@ -463,6 +461,92 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
 		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
+	}
+}
+
+func (s *charmStoreRepoSuite) TestResolveWithChannelEquivalentToResolve(c *gc.C) {
+	s.addResolveTestsCharms(c)
+	client := s.repo.Client().WithChannel(params.StableChannel)
+	repo := charmrepo.NewCharmStoreFromClient(client)
+	for i, test := range resolveTests {
+		c.Logf("test %d: %s", i, test.id)
+		ref, channel, supportedSeries, err := repo.ResolveWithChannel(charm.MustParseURL(test.id))
+		if test.err != "" {
+			c.Check(err.Error(), gc.Equals, test.err)
+			c.Check(ref, gc.IsNil)
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(channel, gc.Equals, params.StableChannel)
+		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
+	}
+}
+
+func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
+	tests := []struct {
+		clientChannel params.Channel
+		published     []params.Channel
+		expected      params.Channel
+	}{{
+		clientChannel: params.StableChannel,
+		expected:      params.StableChannel,
+	}, {
+		clientChannel: params.DevelopmentChannel,
+		expected:      params.DevelopmentChannel,
+	}, {
+		clientChannel: params.UnpublishedChannel,
+		expected:      params.UnpublishedChannel,
+	}, {
+		clientChannel: params.NoChannel,
+		expected:      params.UnpublishedChannel,
+	}, {
+		published: []params.Channel{params.StableChannel},
+		expected:  params.StableChannel,
+	}, {
+		published: []params.Channel{params.DevelopmentChannel},
+		expected:  params.DevelopmentChannel,
+	}, {
+		published: []params.Channel{params.StableChannel, params.DevelopmentChannel},
+		expected:  params.StableChannel,
+	}, {
+		published: []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		expected:  params.StableChannel,
+	}, {
+		clientChannel: params.StableChannel,
+		published:     []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		expected:      params.StableChannel,
+	}, {
+		clientChannel: params.DevelopmentChannel,
+		published:     []params.Channel{params.StableChannel, params.DevelopmentChannel},
+		expected:      params.DevelopmentChannel,
+	}, {
+		clientChannel: params.UnpublishedChannel,
+		published:     []params.Channel{params.StableChannel},
+		expected:      params.UnpublishedChannel,
+	}}
+
+	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
+	cURL := charm.MustParseURL("~who/trusty/mysql")
+
+	for i, test := range tests {
+		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)
+
+		cURL.Revision = i
+		err := s.client.UploadCharmWithRevision(cURL, ch, cURL.Revision)
+		c.Assert(err, gc.IsNil)
+		s.setPublic(c, cURL)
+		if len(test.published) > 0 {
+			s.setPublic(c, cURL, test.published...)
+		} else if test.clientChannel != params.NoChannel && test.clientChannel != params.UnpublishedChannel {
+			s.setPublic(c, cURL, test.clientChannel)
+		}
+		repo := charmrepo.NewCharmStoreFromClient(s.client.WithChannel(test.clientChannel))
+
+		_, channel, _, err := repo.ResolveWithChannel(cURL)
+		c.Assert(err, jc.ErrorIsNil)
+
+		c.Check(channel, gc.Equals, test.expected)
 	}
 }
 
