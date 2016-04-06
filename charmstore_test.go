@@ -398,15 +398,11 @@ func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
 	c.Assert(ch, gc.IsNil)
 }
 
-type charmStoreResolveSuite struct {
-	charmStoreBaseSuite
-}
-
-var _ = gc.Suite(&charmStoreResolveSuite{})
-
 var resolveTests = []struct {
-	id              string
-	url             string
+	id  string
+	url string
+	//clientChannel   params.Channel
+	//published       []params.PublishedInfo
 	supportedSeries []string
 	err             string
 }{{
@@ -455,7 +451,7 @@ var resolveTests = []struct {
 	err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
 }}
 
-func (s *charmStoreResolveSuite) addCharms(c *gc.C) {
+func (s *charmStoreRepoSuite) addResolveTestsCharms(c *gc.C) {
 	// Add promulgated entities first so that the base entity
 	// is marked as promulgated when it first gets inserted.
 	s.addCharm(c, "utopic/mysql-47", "mysql")
@@ -466,11 +462,13 @@ func (s *charmStoreResolveSuite) addCharms(c *gc.C) {
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
 }
 
-func (s *charmStoreResolveSuite) TestResolve(c *gc.C) {
-	s.addCharms(c)
+func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
+	s.addResolveTestsCharms(c)
+	client := s.repo.Client().WithChannel(params.StableChannel)
+	repo := charmrepo.NewCharmStoreFromClient(client)
 	for i, test := range resolveTests {
 		c.Logf("test %d: %s", i, test.id)
-		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
+		ref, supportedSeries, err := repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
 			c.Check(err.Error(), gc.Equals, test.err)
 			c.Check(ref, gc.IsNil)
