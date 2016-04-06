@@ -379,9 +379,64 @@ func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
 	c.Assert(ch, gc.IsNil)
 }
 
-func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
-	// Add some charms to the charm store.
+type charmStoreResolveSuite struct {
+	charmStoreBaseSuite
+}
 
+var _ = gc.Suite(&charmStoreResolveSuite{})
+
+var resolveTests = []struct {
+	id              string
+	url             string
+	supportedSeries []string
+	err             string
+}{{
+	id:              "~who/mysql",
+	url:             "cs:~who/trusty/mysql-0",
+	supportedSeries: []string{"trusty"},
+}, {
+	id:              "~who/trusty/mysql",
+	url:             "cs:~who/trusty/mysql-0",
+	supportedSeries: []string{"trusty"},
+}, {
+	id:              "~who/wordpress",
+	url:             "cs:~who/precise/wordpress-2",
+	supportedSeries: []string{"precise"},
+}, {
+	id:  "~who/wordpress-2",
+	err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
+}, {
+	id:              "~dalek/riak",
+	url:             "cs:~dalek/utopic/riak-42",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "~dalek/utopic/riak-42",
+	url:             "cs:~dalek/utopic/riak-42",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "utopic/mysql",
+	url:             "cs:utopic/mysql-47",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "utopic/mysql-47",
+	url:             "cs:utopic/mysql-47",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "~who/multi-series",
+	url:             "cs:~who/multi-series-0",
+	supportedSeries: []string{"trusty", "precise", "quantal"},
+}, {
+	id:  "~dalek/utopic/riak-100",
+	err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
+}, {
+	id:  "bundle/no-such",
+	err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
+}, {
+	id:  "no-such",
+	err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
+}}
+
+func (s *charmStoreResolveSuite) addCharms(c *gc.C) {
 	// Add promulgated entities first so that the base entity
 	// is marked as promulgated when it first gets inserted.
 	s.addCharm(c, "utopic/mysql-47", "mysql")
@@ -390,61 +445,11 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
 	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
+}
 
-	// Define the tests to be run.
-	tests := []struct {
-		id              string
-		url             string
-		supportedSeries []string
-		err             string
-	}{{
-		id:              "~who/mysql",
-		url:             "cs:~who/trusty/mysql-0",
-		supportedSeries: []string{"trusty"},
-	}, {
-		id:              "~who/trusty/mysql",
-		url:             "cs:~who/trusty/mysql-0",
-		supportedSeries: []string{"trusty"},
-	}, {
-		id:              "~who/wordpress",
-		url:             "cs:~who/precise/wordpress-2",
-		supportedSeries: []string{"precise"},
-	}, {
-		id:  "~who/wordpress-2",
-		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
-	}, {
-		id:              "~dalek/riak",
-		url:             "cs:~dalek/utopic/riak-42",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "~dalek/utopic/riak-42",
-		url:             "cs:~dalek/utopic/riak-42",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "utopic/mysql",
-		url:             "cs:utopic/mysql-47",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "utopic/mysql-47",
-		url:             "cs:utopic/mysql-47",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "~who/multi-series",
-		url:             "cs:~who/multi-series-0",
-		supportedSeries: []string{"trusty", "precise", "quantal"},
-	}, {
-		id:  "~dalek/utopic/riak-100",
-		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
-	}, {
-		id:  "bundle/no-such",
-		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
-	}, {
-		id:  "no-such",
-		err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
-	}}
-
-	// Run the tests.
-	for i, test := range tests {
+func (s *charmStoreResolveSuite) TestResolve(c *gc.C) {
+	s.addCharms(c)
+	for i, test := range resolveTests {
 		c.Logf("test %d: %s", i, test.id)
 		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
