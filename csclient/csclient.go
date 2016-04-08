@@ -14,11 +14,13 @@ import (
 	"net/http"
 	"net/url"
 	"reflect"
+	"strconv"
 	"strings"
 	"unicode"
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
@@ -209,11 +211,17 @@ func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, 
 	path := "/meta/resources?" + values.Encode()
 
 	// Send the request.
-	var charmID2resources map[string][]params.Resource
-	if err := c.Get(path, &charmID2resources); err != nil {
+	var results map[string][]params.Resource
+	if err := c.Get(path, &results); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
-	return charmID2resources, nil
+	// Set all the Origin fields appropriately.
+	for _, rs := range results {
+		for i := range rs {
+			rs[i].Origin = resource.OriginStore.String()
+		}
+	}
+	return results, nil
 }
 
 // UploadResource uploads the bytes for a resource.
@@ -224,7 +232,7 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSe
 	}
 
 	// Prepare the request.
-	req, err := http.NewRequest("PUT", "", nil)
+	req, err := http.NewRequest("POST", "", nil)
 	if err != nil {
 		return -1, errgo.Notef(err, "cannot make new request")
 	}
@@ -234,7 +242,7 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSe
 	hash = url.QueryEscape(hash)
 	path = url.QueryEscape(path)
 
-	url := fmt.Sprintf("/%s/resources/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
+	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
 
 	// Send the request.
 	resp, err := c.DoWithBody(req, url, file)
@@ -290,7 +298,10 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 		return result, errgo.Notef(err, "cannot make new request")
 	}
 
-	url := fmt.Sprintf("/%s/resource/%s/%d", id.Path(), name, revision)
+	url := "/" + id.Path() + "/resource/" + name
+	if revision >= 0 {
+		url += "/" + strconv.Itoa(revision)
+	}
 	resp, err := c.Do(req, url)
 	if err != nil {
 		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)

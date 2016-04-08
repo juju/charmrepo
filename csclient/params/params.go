@@ -312,8 +312,9 @@ type Resource struct {
 	// Description contains user-facing info about the resource.
 	Description string `json:",omitempty"`
 
-	// Origin is where the resource will come from.
-	Origin string
+	// Origin is where the resource has come from.
+	// This is not set in the charmstore response.
+	Origin string `json: ",omitempty"`
 
 	// Revision is the revision, if applicable.
 	Revision int
