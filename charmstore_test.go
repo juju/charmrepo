@@ -98,7 +98,7 @@ func (s *charmStoreBaseSuite) addCharm(c *gc.C, urlStr, name string) (charm.Char
 	err := s.client.UploadCharmWithRevision(id, ch, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 	return ch, id
 }
 
@@ -115,7 +115,7 @@ func (s *charmStoreBaseSuite) addCharmNoRevision(c *gc.C, urlStr, name string) (
 	url, err := s.client.UploadCharm(id, ch)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 
 	return ch, url
 }
@@ -135,22 +135,27 @@ func (s *charmStoreBaseSuite) addBundle(c *gc.C, urlStr, name string) (charm.Bun
 	err := s.client.UploadBundleWithRevision(id, b, promulgatedRevision)
 	c.Assert(err, gc.IsNil)
 
-	s.setPublic(c, id)
+	s.setPublic(c, id, params.StableChannel)
 
 	// Return the bundle and its URL.
 	return b, id
 }
 
-func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL) {
-	// Publish to stable.
-	err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
-		Channels: []params.Channel{params.StableChannel},
-	})
-	c.Assert(err, jc.ErrorIsNil)
+func (s *charmStoreBaseSuite) setPublic(c *gc.C, id *charm.URL, channels ...params.Channel) {
+	if len(channels) > 0 {
+		err := s.client.WithChannel(params.UnpublishedChannel).Put("/"+id.Path()+"/publish", &params.PublishRequest{
+			Channels: channels,
+		})
+		c.Assert(err, jc.ErrorIsNil)
+	} else {
+		channels = []params.Channel{params.UnpublishedChannel}
+	}
 
-	// Allow read permissions to everyone.
-	err = s.client.WithChannel(params.StableChannel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
-	c.Assert(err, jc.ErrorIsNil)
+	for _, channel := range channels {
+		// Allow read permissions to everyone.
+		err := s.client.WithChannel(channel).Put("/"+id.Path()+"/meta/perm/read", []string{params.Everyone})
+		c.Assert(err, jc.ErrorIsNil)
+	}
 }
 
 type charmStoreRepoSuite struct {
@@ -379,9 +384,58 @@ func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
 	c.Assert(ch, gc.IsNil)
 }
 
-func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
-	// Add some charms to the charm store.
+var resolveTests = []struct {
+	id              string
+	url             string
+	supportedSeries []string
+	err             string
+}{{
+	id:              "~who/mysql",
+	url:             "cs:~who/trusty/mysql-0",
+	supportedSeries: []string{"trusty"},
+}, {
+	id:              "~who/trusty/mysql",
+	url:             "cs:~who/trusty/mysql-0",
+	supportedSeries: []string{"trusty"},
+}, {
+	id:              "~who/wordpress",
+	url:             "cs:~who/precise/wordpress-2",
+	supportedSeries: []string{"precise"},
+}, {
+	id:  "~who/wordpress-2",
+	err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
+}, {
+	id:              "~dalek/riak",
+	url:             "cs:~dalek/utopic/riak-42",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "~dalek/utopic/riak-42",
+	url:             "cs:~dalek/utopic/riak-42",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "utopic/mysql",
+	url:             "cs:utopic/mysql-47",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "utopic/mysql-47",
+	url:             "cs:utopic/mysql-47",
+	supportedSeries: []string{"utopic"},
+}, {
+	id:              "~who/multi-series",
+	url:             "cs:~who/multi-series-0",
+	supportedSeries: []string{"trusty", "precise", "quantal"},
+}, {
+	id:  "~dalek/utopic/riak-100",
+	err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
+}, {
+	id:  "bundle/no-such",
+	err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
+}, {
+	id:  "no-such",
+	err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
+}}
 
+func (s *charmStoreRepoSuite) addResolveTestsCharms(c *gc.C) {
 	// Add promulgated entities first so that the base entity
 	// is marked as promulgated when it first gets inserted.
 	s.addCharm(c, "utopic/mysql-47", "mysql")
@@ -390,63 +444,15 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
 	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
+}
 
-	// Define the tests to be run.
-	tests := []struct {
-		id              string
-		url             string
-		supportedSeries []string
-		err             string
-	}{{
-		id:              "~who/mysql",
-		url:             "cs:~who/trusty/mysql-0",
-		supportedSeries: []string{"trusty"},
-	}, {
-		id:              "~who/trusty/mysql",
-		url:             "cs:~who/trusty/mysql-0",
-		supportedSeries: []string{"trusty"},
-	}, {
-		id:              "~who/wordpress",
-		url:             "cs:~who/precise/wordpress-2",
-		supportedSeries: []string{"precise"},
-	}, {
-		id:  "~who/wordpress-2",
-		err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
-	}, {
-		id:              "~dalek/riak",
-		url:             "cs:~dalek/utopic/riak-42",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "~dalek/utopic/riak-42",
-		url:             "cs:~dalek/utopic/riak-42",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "utopic/mysql",
-		url:             "cs:utopic/mysql-47",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "utopic/mysql-47",
-		url:             "cs:utopic/mysql-47",
-		supportedSeries: []string{"utopic"},
-	}, {
-		id:              "~who/multi-series",
-		url:             "cs:~who/multi-series-0",
-		supportedSeries: []string{"trusty", "precise", "quantal"},
-	}, {
-		id:  "~dalek/utopic/riak-100",
-		err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
-	}, {
-		id:  "bundle/no-such",
-		err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
-	}, {
-		id:  "no-such",
-		err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
-	}}
-
-	// Run the tests.
-	for i, test := range tests {
+func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
+	s.addResolveTestsCharms(c)
+	client := s.repo.Client().WithChannel(params.StableChannel)
+	repo := charmrepo.NewCharmStoreFromClient(client)
+	for i, test := range resolveTests {
 		c.Logf("test %d: %s", i, test.id)
-		ref, supportedSeries, err := s.repo.Resolve(charm.MustParseURL(test.id))
+		ref, supportedSeries, err := repo.Resolve(charm.MustParseURL(test.id))
 		if test.err != "" {
 			c.Check(err.Error(), gc.Equals, test.err)
 			c.Check(ref, gc.IsNil)
@@ -455,6 +461,92 @@ func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
 		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
+	}
+}
+
+func (s *charmStoreRepoSuite) TestResolveWithChannelEquivalentToResolve(c *gc.C) {
+	s.addResolveTestsCharms(c)
+	client := s.repo.Client().WithChannel(params.StableChannel)
+	repo := charmrepo.NewCharmStoreFromClient(client)
+	for i, test := range resolveTests {
+		c.Logf("test %d: %s", i, test.id)
+		ref, channel, supportedSeries, err := repo.ResolveWithChannel(charm.MustParseURL(test.id))
+		if test.err != "" {
+			c.Check(err.Error(), gc.Equals, test.err)
+			c.Check(ref, gc.IsNil)
+			continue
+		}
+		c.Assert(err, jc.ErrorIsNil)
+		c.Check(ref, jc.DeepEquals, charm.MustParseURL(test.url))
+		c.Check(channel, gc.Equals, params.StableChannel)
+		c.Check(supportedSeries, jc.SameContents, test.supportedSeries)
+	}
+}
+
+func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
+	tests := []struct {
+		clientChannel params.Channel
+		published     []params.Channel
+		expected      params.Channel
+	}{{
+		clientChannel: params.StableChannel,
+		expected:      params.StableChannel,
+	}, {
+		clientChannel: params.DevelopmentChannel,
+		expected:      params.DevelopmentChannel,
+	}, {
+		clientChannel: params.UnpublishedChannel,
+		expected:      params.UnpublishedChannel,
+	}, {
+		clientChannel: params.NoChannel,
+		expected:      params.UnpublishedChannel,
+	}, {
+		published: []params.Channel{params.StableChannel},
+		expected:  params.StableChannel,
+	}, {
+		published: []params.Channel{params.DevelopmentChannel},
+		expected:  params.DevelopmentChannel,
+	}, {
+		published: []params.Channel{params.StableChannel, params.DevelopmentChannel},
+		expected:  params.StableChannel,
+	}, {
+		published: []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		expected:  params.StableChannel,
+	}, {
+		clientChannel: params.StableChannel,
+		published:     []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		expected:      params.StableChannel,
+	}, {
+		clientChannel: params.DevelopmentChannel,
+		published:     []params.Channel{params.StableChannel, params.DevelopmentChannel},
+		expected:      params.DevelopmentChannel,
+	}, {
+		clientChannel: params.UnpublishedChannel,
+		published:     []params.Channel{params.StableChannel},
+		expected:      params.UnpublishedChannel,
+	}}
+
+	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
+	cURL := charm.MustParseURL("~who/trusty/mysql")
+
+	for i, test := range tests {
+		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)
+
+		cURL.Revision = i
+		err := s.client.UploadCharmWithRevision(cURL, ch, cURL.Revision)
+		c.Assert(err, gc.IsNil)
+		s.setPublic(c, cURL)
+		if len(test.published) > 0 {
+			s.setPublic(c, cURL, test.published...)
+		} else if test.clientChannel != params.NoChannel && test.clientChannel != params.UnpublishedChannel {
+			s.setPublic(c, cURL, test.clientChannel)
+		}
+		repo := charmrepo.NewCharmStoreFromClient(s.client.WithChannel(test.clientChannel))
+
+		_, channel, _, err := repo.ResolveWithChannel(cURL)
+		c.Assert(err, jc.ErrorIsNil)
+
+		c.Check(channel, gc.Equals, test.expected)
 	}
 }
 

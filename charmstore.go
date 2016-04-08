@@ -212,9 +212,20 @@ func verifyHash384AndSize(path, expectHash string, expectSize int64) error {
 
 // Resolve implements Interface.Resolve.
 func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
+	resolved, _, supportedSeries, err := s.ResolveWithChannel(ref)
+	if err != nil {
+		return nil, nil, errgo.Mask(err, errgo.Any)
+	}
+	return resolved, supportedSeries, nil
+}
+
+// ResolveWithChannel does the same thing as Resolve() but also returns
+// the best channel to use.
+func (s *CharmStore) ResolveWithChannel(ref *charm.URL) (*charm.URL, params.Channel, []string, error) {
 	var result struct {
 		Id              params.IdResponse
 		SupportedSeries params.SupportedSeriesResponse
+		Published       params.PublishedResponse
 	}
 	if _, err := s.client.Meta(ref, &result); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
@@ -226,9 +237,41 @@ func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 			case "":
 				etype = "charm or bundle"
 			}
-			return nil, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
+			return nil, params.NoChannel, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %s not found", ref, etype)
 		}
-		return nil, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
+		return nil, params.NoChannel, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
-	return result.Id.Id, result.SupportedSeries.SupportedSeries, nil
+	// TODO(ericsnow) Get this directly from the API. It has high risk
+	// of getting stale. Perhaps add params.PublishedResponse.BestChannel
+	// or, less desireably, have params.PublishedResponse.Info be
+	// priority-ordered.
+	channel := bestChannel(s.client, result.Published.Info)
+	return result.Id.Id, channel, result.SupportedSeries.SupportedSeries, nil
+}
+
+// bestChannel determines the best channel to use for the given client
+// and published info.
+//
+// Note that this is equivalent to code on the server side.
+// See ReqHandler.entityChannel in internal/v5/auth.go.
+func bestChannel(client *csclient.Client, published []params.PublishedInfo) params.Channel {
+	explicitChannel := client.Channel()
+	if explicitChannel != params.NoChannel {
+		return explicitChannel
+	}
+
+	bestChannel := params.UnpublishedChannel
+	for _, info := range published {
+		// TODO(ericsnow) Favor the one with info.Current == true?
+		switch info.Channel {
+		case params.StableChannel:
+			bestChannel = info.Channel
+			break
+		case params.DevelopmentChannel:
+			bestChannel = info.Channel
+		default:
+			panic(fmt.Sprintf("unknown channel %q", info.Channel))
+		}
+	}
+	return bestChannel
 }
