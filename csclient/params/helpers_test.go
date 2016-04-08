@@ -113,14 +113,16 @@ func (HelpersSuite) TestAPI2ResourceBasic(c *gc.C) {
 
 func (HelpersSuite) TestAPI2ResourceNegativeRevision(c *gc.C) {
 	_, err := params.API2Resource(params.Resource{
-		Name:     "spam",
-		Type:     "file",
-		Path:     "spam.tgz",
-		Origin:   "upload",
-		Revision: -1,
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Fingerprint: []byte(fingerprint),
+		Size:        20,
+		Origin:      "store",
+		Revision:    -1,
 	})
 
-	c.Check(err, gc.ErrorMatches, `invalid resource \(revision must be non-negative\)`)
+	c.Check(err, gc.ErrorMatches, `bad revision: must be non-negative, got -1`)
 }
 
 func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
@@ -205,7 +207,7 @@ func (HelpersSuite) TestAPI2ResourceEmptyFingerprintWithSize(c *gc.C) {
 		Size:        10,
 	})
 
-	c.Check(err, gc.ErrorMatches, `missing fingerprint`)
+	c.Check(err, gc.ErrorMatches, `bad file info: missing fingerprint`)
 }
 
 func (HelpersSuite) TestAPI2ResourceValidateFailed(c *gc.C) {

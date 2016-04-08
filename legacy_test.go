@@ -99,9 +99,9 @@ func (s *legacyCharmStoreSuite) TestLatest(c *gc.C) {
 	revInfo, err := s.store.Latest(urls...)
 	c.Assert(err, gc.IsNil)
 	c.Assert(revInfo, jc.DeepEquals, []charmrepo.CharmRevision{
-		{23, "843f8bba130a9705249f038202fab24e5151e3a2f7b6626f4508a5725739a5b5", nil},
-		{23, "843f8bba130a9705249f038202fab24e5151e3a2f7b6626f4508a5725739a5b5", nil},
-		{23, "843f8bba130a9705249f038202fab24e5151e3a2f7b6626f4508a5725739a5b5", nil},
+		{23, s.server.ArchiveSHA256, nil},
+		{23, s.server.ArchiveSHA256, nil},
+		{23, s.server.ArchiveSHA256, nil},
 	})
 }
 

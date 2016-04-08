@@ -25,10 +25,12 @@ var logger = loggo.GetLogger("juju.charm.testing.mockstore")
 
 // MockStore provides a mock charm store implementation useful when testing.
 type MockStore struct {
-	mux                     *http.ServeMux
-	listener                net.Listener
-	archiveBytes            []byte
-	archiveSha256           string
+	mux          *http.ServeMux
+	listener     net.Listener
+	archiveBytes []byte
+	// ArchiveSHA256 holds the hex-encoded SHA256 checksum
+	// of the charm archive served by the mock store.
+	ArchiveSHA256           string
 	Downloads               []*charm.URL
 	DownloadsNoStats        []*charm.URL
 	Authorizations          []string
@@ -47,7 +49,9 @@ func NewMockStore(c *gc.C, repo *Repo, charms map[string]int) *MockStore {
 	c.Assert(err, gc.IsNil)
 	defer f.Close()
 	buf := &bytes.Buffer{}
-	s.archiveSha256, _, err = utils.ReadSHA256(io.TeeReader(f, buf))
+	s.ArchiveSHA256, _, err = utils.ReadSHA256(io.TeeReader(f, buf))
+	c.Logf("ArchiveSHA256: %v", s.ArchiveSHA256)
+
 	c.Assert(err, gc.IsNil)
 	s.archiveBytes = buf.Bytes()
 	c.Assert(err, gc.IsNil)
@@ -121,7 +125,7 @@ func (s *MockStore) serveInfo(w http.ResponseWriter, r *http.Request) {
 				} else {
 					cr.Revision = charmURL.Revision
 				}
-				cr.Sha256 = s.archiveSha256
+				cr.Sha256 = s.ArchiveSHA256
 				cr.CanonicalURL = charmURL.String()
 			} else {
 				cr.Errors = append(cr.Errors, "entry not found")

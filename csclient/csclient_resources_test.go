@@ -37,7 +37,6 @@ func (ResourceSuite) TestListResources(c *gc.C) {
 			{
 				Name:        "data",
 				Type:        "file",
-				Origin:      "store",
 				Path:        "data.zip",
 				Description: "some zip file",
 				Revision:    1,
@@ -62,7 +61,15 @@ func (ResourceSuite) TestListResources(c *gc.C) {
 	url := charm.MustParseURL("cs:quantal/starsay")
 	ret, err := client.ListResources([]*charm.URL{url})
 	c.Assert(err, jc.ErrorIsNil)
-	c.Assert(ret, gc.DeepEquals, results)
+
+	// Add the origin to the results - the csclient code is responsible
+	// for adding it.
+	for _, rs := range results {
+		for i := range rs {
+			rs[i].Origin = "store"
+		}
+	}
+	c.Assert(ret, jc.DeepEquals, results)
 }
 
 func (ResourceSuite) TestUploadResource(c *gc.C) {
@@ -94,7 +101,7 @@ func (ResourceSuite) TestUploadResource(c *gc.C) {
 	hash, size, err := readerHashAndSize(reader)
 	c.Assert(err, jc.ErrorIsNil)
 
-	c.Assert(req.URL.String(), gc.Equals, "/v5/quantal/starsay/resources/resname?hash="+hash+"&filename=data.zip")
+	c.Assert(req.URL.String(), gc.Equals, "/v5/quantal/starsay/resource/resname?hash="+hash+"&filename=data.zip")
 	c.Assert(req.ContentLength, gc.Equals, size)
 	c.Assert(body, gc.DeepEquals, reader)
 }
