@@ -25,6 +25,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/juju/charmstore.v5-unstable"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
@@ -40,11 +41,11 @@ import (
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
 
 // Define fake attributes to be used in tests.
-var fakeReader, fakeHash, fakeSize = func() (io.ReadSeeker, string, int64) {
-	content := []byte("fake content")
+var fakeContent, fakeHash, fakeSize = func() (string, string, int64) {
+	content := "fake content"
 	h := sha512.New384()
-	h.Write(content)
-	return bytes.NewReader(content), fmt.Sprintf("%x", h.Sum(nil)), int64(len(content))
+	h.Write([]byte(content))
+	return content, fmt.Sprintf("%x", h.Sum(nil)), int64(len(content))
 }()
 
 type suite struct {
@@ -630,7 +631,7 @@ func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
 	for i, test := range uploadArchiveWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
 		cl := badResponseClient(test.response, test.error)
-		id, err := csclient.UploadArchive(cl, id, fakeReader, fakeHash, fakeSize, -1)
+		id, err := csclient.UploadArchive(cl, id, strings.NewReader(fakeContent), fakeHash, fakeSize, -1)
 		c.Assert(id, gc.IsNil)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
@@ -1500,6 +1501,112 @@ func (s *suite) TestPublishNoChannel(c *gc.C) {
 	id := charm.MustParseURL("cs:~who/trusty/mysql")
 	err := s.client.Publish(id, nil, nil)
 	c.Assert(err, jc.ErrorIsNil)
+}
+
+func (s *suite) TestUploadResource(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo.zip",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	for i := 0; i < 3; i++ {
+		// Upload the resource.
+		data := fmt.Sprintf("boo!%d", i)
+		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data))
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(rev, gc.Equals, i)
+
+		// Check that we can download it OK.
+		getResult, err := s.client.GetResource(url, "resname", i)
+		c.Assert(err, jc.ErrorIsNil)
+		defer getResult.Close()
+
+		expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(data)))
+		c.Assert(getResult.Hash, gc.Equals, expectHash)
+		c.Assert(getResult.Size, gc.Equals, int64(len(data)))
+
+		gotData, err := ioutil.ReadAll(getResult)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(string(gotData), gc.Equals, data)
+	}
+}
+
+func (s *suite) TestListResources(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Path:        "foo.zip",
+				Description: "r1 description",
+			},
+			"r2": {
+				Name:        "r2",
+				Path:        "bar",
+				Description: "r2 description",
+			},
+			"r3": {
+				Name:        "r3",
+				Path:        "missing",
+				Description: "r3 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/trusty/mysql")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	r1content := "r1 content"
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	r2content := "r2 content"
+	rev, err = s.client.UploadResource(url, "r2", "data", strings.NewReader(r2content))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	result, err := s.client.WithChannel(params.UnpublishedChannel).ListResources(url)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(result, jc.DeepEquals, []params.Resource{{
+		Name:        "r1",
+		Type:        "file",
+		Path:        "foo.zip",
+		Origin:      "store",
+		Description: "r1 description",
+		Revision:    0,
+		Fingerprint: resourceHash(r1content),
+		Size:        int64(len(r1content)),
+	}, {
+		Name:        "r2",
+		Type:        "file",
+		Path:        "bar",
+		Origin:      "store",
+		Description: "r2 description",
+		Revision:    0,
+		Fingerprint: resourceHash(r2content),
+		Size:        int64(len(r2content)),
+	}, {
+		Name:        "r3",
+		Type:        "file",
+		Origin:      "store",
+		Path:        "missing",
+		Description: "r3 description",
+		Revision:    -1,
+	}})
+}
+
+func resourceHash(s string) []byte {
+	fp, err := resource.GenerateFingerprint(strings.NewReader(s))
+	if err != nil {
+		panic(err)
+	}
+	return fp.Bytes()
 }
 
 func (s *suite) setPublic(c *gc.C, id *charm.URL) {
