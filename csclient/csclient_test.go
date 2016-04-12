@@ -69,37 +69,6 @@ func (s *suite) SetUpTest(c *gc.C) {
 	})
 }
 
-func (s *suite) TestNewWithBakeryClient(c *gc.C) {
-	// Make a csclient.Client with a custom bakery client that
-	// enables us to tell if that's really being used.
-	bclient := httpbakery.NewClient()
-	acquired := false
-	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
-		acquired = true
-		return bclient.AcquireDischarge(firstPartyLocation, cav)
-	})
-	client := csclient.New(csclient.Params{
-		URL:          s.srv.URL,
-		BakeryClient: bclient,
-	})
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
-	err := client.UploadCharmWithRevision(
-		charm.MustParseURL("~bob/precise/wordpress-0"),
-		charmRepo.CharmDir("wordpress"),
-		42,
-	)
-	c.Assert(err, gc.IsNil)
-	c.Assert(acquired, gc.Equals, true)
-}
-
-type dischargeAcquirerFunc func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error)
-
-func (f dischargeAcquirerFunc) AcquireDischarge(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
-	return f(firstPartyLocation, cav)
-}
-
 func (s *suite) TearDownTest(c *gc.C) {
 	s.srv.Close()
 	s.handler.Close()
@@ -129,6 +98,80 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 	s.srv = httptest.NewServer(handler)
 	s.serverParams = serverParams
 
+}
+
+func (s *suite) TestNewWithBakeryClient(c *gc.C) {
+	// Make a csclient.Client with a custom bakery client that
+	// enables us to tell if that's really being used.
+	bclient := httpbakery.NewClient()
+	acquired := false
+	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+		acquired = true
+		return bclient.AcquireDischarge(firstPartyLocation, cav)
+	})
+	client := csclient.New(csclient.Params{
+		URL:          s.srv.URL,
+		BakeryClient: bclient,
+	})
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
+	}
+	err := client.UploadCharmWithRevision(
+		charm.MustParseURL("~bob/precise/wordpress-0"),
+		charmRepo.CharmDir("wordpress"),
+		42,
+	)
+	c.Assert(err, gc.IsNil)
+	c.Assert(acquired, gc.Equals, true)
+}
+
+func (s *suite) TestIsAuthorizationError(c *gc.C) {
+	bclient := httpbakery.NewClient()
+	client := csclient.New(csclient.Params{
+		URL:          s.srv.URL,
+		BakeryClient: bclient,
+	})
+	doSomething := func() error {
+		// Make a request that requires a discharge, which will be denied.
+		err := client.UploadCharmWithRevision(
+			charm.MustParseURL("~bob/precise/wordpress-0"),
+			charmRepo.CharmDir("wordpress"),
+			42,
+		)
+		return errgo.Mask(err, errgo.Any)
+	}
+	err := doSomething()
+	c.Assert(err, gc.ErrorMatches, `cannot log in: cannot retrieve the authentication macaroon: cannot get discharge from "https://.*": third party refused discharge: cannot discharge: no discharge`)
+	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError, gc.Commentf("cause type %T", errgo.Cause(err)))
+
+	// Make a request that requires an interaction, which will also be denied.
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return nil, &httpbakery.Error{
+			Code:    httpbakery.ErrInteractionRequired,
+			Message: "get out more",
+			Info: &httpbakery.ErrorInfo{
+				VisitURL: "http://0.1.2.3/",
+				WaitURL:  "http://0.1.2.3/",
+			},
+		}
+	}
+	err = doSomething()
+	c.Assert(err, gc.ErrorMatches, `cannot log in: cannot retrieve the authentication macaroon: cannot get discharge from "https://.*": cannot start interactive session: interaction required but not possible`)
+	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError)
+
+	// Make a request that is denied because it's with the wrong user.
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice")}, nil
+	}
+	err = doSomething()
+	c.Assert(err, gc.ErrorMatches, `cannot post archive: unauthorized: access denied for user "alice"`)
+	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError)
+
+	err = &params.Error{
+		Message: "hello",
+		Code:    params.ErrForbidden,
+	}
+	c.Assert(err, gc.Not(jc.Satisfies), csclient.IsAuthorizationError)
 }
 
 func (s *suite) TestDefaultServerURL(c *gc.C) {
@@ -1751,4 +1794,10 @@ func hashOfPath(c *gc.C, path string) string {
 	_, err = io.Copy(hash, f)
 	c.Assert(err, jc.ErrorIsNil)
 	return fmt.Sprintf("%x", hash.Sum(nil))
+}
+
+type dischargeAcquirerFunc func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error)
+
+func (f dischargeAcquirerFunc) AcquireDischarge(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+	return f(firstPartyLocation, cav)
 }

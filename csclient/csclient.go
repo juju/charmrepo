@@ -2,6 +2,14 @@
 // Licensed under the LGPLv3, see LICENCE file for details.
 
 // The csclient package provides access to the charm store API.
+//
+// Errors returned from the remote API server with an associated error
+// code will have a cause of type params.ErrorCode holding that code.
+//
+// If a call to the API returns an error because authorization has been
+// denied, an error with a cause satisfying IsAuthorizationError will be
+// returned. Note that these errors can also include errors returned by
+// httpbakery when it attempts to discharge macaroons.
 package csclient // import "gopkg.in/juju/charmrepo.v2-unstable/csclient"
 
 import (
@@ -167,7 +175,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	}
 	resp, err := c.Do(req, u.String())
 	if err != nil {
-		return nil, nil, "", 0, errgo.NoteMask(err, "cannot get archive", errgo.Any)
+		return nil, nil, "", 0, errgo.NoteMask(err, "cannot get archive", isAPIError)
 	}
 
 	// Validate the response headers.
@@ -208,7 +216,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 func (c *Client) ListResources(id *charm.URL) ([]params.Resource, error) {
 	var result []params.Resource
 	if err := c.Get("/"+id.Path()+"/meta/resources", &result); err != nil {
-		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
+		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", isAPIError)
 	}
 	// Set all the Origin fields appropriately.
 	for i := range result {
@@ -240,7 +248,7 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReadSe
 	// Send the request.
 	resp, err := c.DoWithBody(req, url, file)
 	if err != nil {
-		return -1, errgo.NoteMask(err, "cannot post resource", errgo.Any)
+		return -1, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
 	defer resp.Body.Close()
 
@@ -263,7 +271,7 @@ func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 		Channels:  channels,
 	}
 	if err := s.Put("/"+id.Path()+"/publish", val); err != nil {
-		return errgo.Mask(err)
+		return errgo.Mask(err, isAPIError)
 	}
 	return nil
 }
@@ -297,7 +305,7 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 	}
 	resp, err := c.Do(req, url)
 	if err != nil {
-		return result, errgo.NoteMask(err, "cannot get resource", errgo.Any)
+		return result, errgo.NoteMask(err, "cannot get resource", isAPIError)
 	}
 	defer func() {
 		if err != nil {
@@ -328,7 +336,7 @@ func (c *Client) ResourceMeta(id *charm.URL, name string, revision int) (params.
 	path := fmt.Sprintf("/%s/meta/resource/%s/%d", id.Path(), name, revision)
 	var result params.Resource
 	if err := c.Get(path, &result); err != nil {
-		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), errgo.Any)
+		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), isAPIError)
 	}
 	return result, nil
 }
@@ -374,7 +382,7 @@ func (c *Client) UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulga
 	}
 	defer r.Close()
 	_, err = c.uploadArchive(id, r, hash, size, promulgatedRevision)
-	return errgo.Mask(err)
+	return errgo.Mask(err, isAPIError)
 }
 
 // UploadBundle uploads the given charm to the charm store with the given id,
@@ -413,7 +421,7 @@ func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulg
 	}
 	defer r.Close()
 	_, err = c.uploadArchive(id, r, hash, size, promulgatedRevision)
-	return errgo.Mask(err)
+	return errgo.Mask(err, isAPIError)
 }
 
 // uploadArchive pushes the archive for the charm or bundle represented by
@@ -434,7 +442,7 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 	// We only need to do this when basic auth credentials are not provided.
 	if c.params.User == "" {
 		if err := c.Login(); err != nil {
-			return nil, errgo.Notef(err, "cannot log in")
+			return nil, errgo.NoteMask(err, "cannot log in", isAPIError)
 		}
 	}
 	method := "POST"
@@ -464,7 +472,7 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 		body,
 	)
 	if err != nil {
-		return nil, errgo.NoteMask(err, "cannot post archive", errgo.Any)
+		return nil, errgo.NoteMask(err, "cannot post archive", isAPIError)
 	}
 	defer resp.Body.Close()
 
@@ -576,7 +584,7 @@ func (c *Client) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
 		path += "?" + strings.Join(includes, "&")
 	}
 	if err := c.Get(path, &rawResult); err != nil {
-		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), errgo.Any)
+		return nil, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), isAPIError)
 	}
 	// Note that the server is not required to send back values
 	// for all fields. "If there is no metadata for the given meta path, the
@@ -631,7 +639,7 @@ func (c *Client) Get(path string, result interface{}) error {
 	}
 	resp, err := c.Do(req, path)
 	if err != nil {
-		return errgo.Mask(err, errgo.Any)
+		return errgo.Mask(err, isAPIError)
 	}
 	defer resp.Body.Close()
 	// Parse the response.
@@ -664,7 +672,7 @@ func (c *Client) PutWithResponse(path string, val, result interface{}) error {
 	body := bytes.NewReader(data)
 	resp, err := c.DoWithBody(req, path, body)
 	if err != nil {
-		return errgo.Mask(err, errgo.Any)
+		return errgo.Mask(err, isAPIError)
 	}
 	defer resp.Body.Close()
 	// Parse the response.
@@ -722,7 +730,7 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	// Send the request.
 	resp, err := c.bclient.DoWithBody(req, body)
 	if err != nil {
-		return nil, errgo.Mask(err, errgo.Any)
+		return nil, errgo.Mask(err, isAPIError)
 	}
 
 	if resp.StatusCode == http.StatusOK {
@@ -801,7 +809,7 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 	req.Header.Set("Content-Type", "application/json")
 	resp, err := cs.DoWithBody(req, "/log", bytes.NewReader(b))
 	if err != nil {
-		return errgo.NoteMask(err, "cannot send log message", errgo.Any)
+		return errgo.NoteMask(err, "cannot send log message", isAPIError)
 	}
 	resp.Body.Close()
 	return nil
@@ -813,7 +821,7 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 // *httpbakery.InteractionError.
 func (cs *Client) Login() error {
 	if err := cs.Get("/delegatable-macaroon", &struct{}{}); err != nil {
-		return errgo.NoteMask(err, "cannot retrieve the authentication macaroon", httpbakery.IsInteractionError)
+		return errgo.NoteMask(err, "cannot retrieve the authentication macaroon", isAPIError)
 	}
 	return nil
 }
@@ -823,7 +831,7 @@ func (cs *Client) Login() error {
 func (cs *Client) WhoAmI() (*params.WhoAmIResponse, error) {
 	var response params.WhoAmIResponse
 	if err := cs.Get("/whoami", &response); err != nil {
-		return nil, errgo.Mask(err)
+		return nil, errgo.Mask(err, isAPIError)
 	}
 	return &response, nil
 }
@@ -861,7 +869,7 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 		}
 	}
 	if err := cs.Get(u.String(), &results); err != nil {
-		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", errgo.Any)
+		return nil, errgo.NoteMask(err, "cannot get metadata from the charm store", isAPIError)
 	}
 
 	// Build the response.
@@ -885,3 +893,30 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 // JujuMetadataHTTPHeader is the HTTP header name used to send Juju metadata
 // attributes to the charm store.
 const JujuMetadataHTTPHeader = "Juju-Metadata"
+
+// IsAuthorizationError reports whether the given error
+// was returned because authorization was denied for a
+// charmstore request.
+func IsAuthorizationError(err error) bool {
+	err = errgo.Cause(err)
+	switch {
+	case httpbakery.IsDischargeError(err):
+		return true
+	case httpbakery.IsInteractionError(err):
+		return true
+	case err == params.ErrUnauthorized:
+		return true
+	}
+	return false
+}
+
+func isAPIError(err error) bool {
+	if err == nil {
+		return false
+	}
+	err = errgo.Cause(err)
+	if _, ok := err.(params.ErrorCode); ok {
+		return true
+	}
+	return IsAuthorizationError(err)
+}
