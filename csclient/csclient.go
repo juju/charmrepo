@@ -202,31 +202,19 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
-// ListResources retrieves the metadata about resources for the given charm. It returns a map of charm.URL to resources.
-func (c *Client) ListResources(ids []*charm.URL) (map[string][]params.Resource, error) {
-	// Prepare the request.
-	urls := make([]string, len(ids))
-	for i, id := range ids {
-		urls[i] = id.WithRevision(-1).String()
-	}
-	values := url.Values{
-		"id":          urls,
-		"ignore-auth": []string{"1"},
-	}
-	path := "/meta/resources?" + values.Encode()
-
-	// Send the request.
-	var results map[string][]params.Resource
-	if err := c.Get(path, &results); err != nil {
+// ListResources retrieves the metadata about resources for the given charms.
+// It returns a slice with an element for each of the given ids, holding the
+// resources for the respective id.
+func (c *Client) ListResources(id *charm.URL) ([]params.Resource, error) {
+	var result []params.Resource
+	if err := c.Get("/"+id.Path()+"/meta/resources", &result); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", errgo.Any)
 	}
 	// Set all the Origin fields appropriately.
-	for _, rs := range results {
-		for i := range rs {
-			rs[i].Origin = resource.OriginStore.String()
-		}
+	for i := range result {
+		result[i].Origin = resource.OriginStore.String()
 	}
-	return results, nil
+	return result, nil
 }
 
 // UploadResource uploads the bytes for a resource.

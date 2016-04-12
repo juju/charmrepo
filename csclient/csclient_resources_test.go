@@ -27,51 +27,6 @@ type ResourceSuite struct{}
 
 var _ = gc.Suite(ResourceSuite{})
 
-func (ResourceSuite) TestListResources(c *gc.C) {
-	data := "somedata"
-	fp, err := resource.GenerateFingerprint(strings.NewReader(data))
-	c.Assert(err, jc.ErrorIsNil)
-
-	results := map[string][]params.Resource{
-		"cs:quantal/starsay": []params.Resource{
-			{
-				Name:        "data",
-				Type:        "file",
-				Path:        "data.zip",
-				Description: "some zip file",
-				Revision:    1,
-				Fingerprint: fp.Bytes(),
-				Size:        int64(len(data)),
-			},
-		},
-	}
-
-	b, err := json.Marshal(results)
-	c.Assert(err, jc.ErrorIsNil)
-
-	f := &fakeClient{
-		Stub: &testing.Stub{},
-		ReturnDoWithBody: &http.Response{
-			StatusCode: 200,
-			Body:       ioutil.NopCloser(bytes.NewReader(b)),
-		},
-	}
-
-	client := Client{bclient: f}
-	url := charm.MustParseURL("cs:quantal/starsay")
-	ret, err := client.ListResources([]*charm.URL{url})
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Add the origin to the results - the csclient code is responsible
-	// for adding it.
-	for _, rs := range results {
-		for i := range rs {
-			rs[i].Origin = "store"
-		}
-	}
-	c.Assert(ret, jc.DeepEquals, results)
-}
-
 func (ResourceSuite) TestUploadResource(c *gc.C) {
 	data := []byte("boo!")
 	reader := bytes.NewReader(data)
