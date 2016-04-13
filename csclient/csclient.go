@@ -333,7 +333,7 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 // ResourceMeta returns the metadata for the resource on charm id with the
 // given name and revision.
 func (c *Client) ResourceMeta(id *charm.URL, name string, revision int) (params.Resource, error) {
-	path := fmt.Sprintf("/%s/meta/resource/%s/%d", id.Path(), name, revision)
+	path := fmt.Sprintf("/%s/meta/resources/%s/%d", id.Path(), name, revision)
 	var result params.Resource
 	if err := c.Get(path, &result); err != nil {
 		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), isAPIError)
