@@ -125,6 +125,35 @@ func (s *suite) TestNewWithBakeryClient(c *gc.C) {
 	c.Assert(acquired, gc.Equals, true)
 }
 
+func (s *suite) TestNewWithAuth(c *gc.C) {
+	// First acquire the macaroon slice that we'll use for authorization.
+	var m macaroon.Macaroon
+	err := s.client.Get("/macaroon", &m)
+	c.Assert(err, gc.IsNil)
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
+	}
+	ms, err := httpbakery.NewClient().DischargeAll(&m)
+	c.Assert(err, gc.IsNil)
+
+	client := csclient.New(csclient.Params{
+		URL:  s.srv.URL,
+		Auth: ms,
+	})
+
+	// Change the discharge function so that we refuse to discharge anything
+	// to make sure that we're actually using the creds above.
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return nil, errgo.Newf("no discharge")
+	}
+	err = client.UploadCharmWithRevision(
+		charm.MustParseURL("~bob/precise/wordpress-0"),
+		charmRepo.CharmDir("wordpress"),
+		42,
+	)
+	c.Assert(err, gc.IsNil)
+}
+
 func (s *suite) TestIsAuthorizationError(c *gc.C) {
 	bclient := httpbakery.NewClient()
 	client := csclient.New(csclient.Params{
@@ -1008,6 +1037,59 @@ func (s *suite) TestGetWithBadResponse(c *gc.C) {
 		err := cl.Get("/foo", &result)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
+}
+
+func (s *suite) TestResourceMeta(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Path:        "foo.zip",
+				Description: "r1 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/trusty/mysql")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	r1content0 := "r1 content 0"
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content0))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	r1content1 := "r1 content 1"
+	rev, err = s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content1))
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 1)
+
+	// Try with a specified revision number.
+	r, err := s.client.ResourceMeta(url, "r1", 0)
+	c.Assert(err, gc.IsNil)
+	c.Assert(r, jc.DeepEquals, params.Resource{
+		Name:        "r1",
+		Type:        "file",
+		Path:        "foo.zip",
+		Origin:      "store",
+		Description: "r1 description",
+		Revision:    0,
+		Fingerprint: resourceHash(r1content0),
+		Size:        int64(len(r1content0)),
+	})
+
+	// Try with a negative (latest revision) revision.
+	r, err = s.client.ResourceMeta(url, "r1", -1)
+	c.Assert(err, gc.IsNil)
+	c.Assert(r, jc.DeepEquals, params.Resource{
+		Name:        "r1",
+		Type:        "file",
+		Path:        "foo.zip",
+		Origin:      "store",
+		Description: "r1 description",
+		Revision:    1,
+		Fingerprint: resourceHash(r1content1),
+		Size:        int64(len(r1content1)),
+	})
 }
 
 func badResponseClient(resp *http.Response, err error) *csclient.Client {
