@@ -331,13 +331,18 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 }
 
 // ResourceMeta returns the metadata for the resource on charm id with the
-// given name and revision.
+// given name and revision. If the revision is negative, the latest version
+// of the resource will be returned.
 func (c *Client) ResourceMeta(id *charm.URL, name string, revision int) (params.Resource, error) {
-	path := fmt.Sprintf("/%s/meta/resources/%s/%d", id.Path(), name, revision)
+	path := fmt.Sprintf("/%s/meta/resources/%s", id.Path(), name)
+	if revision >= 0 {
+		path += fmt.Sprintf("/%d", revision)
+	}
 	var result params.Resource
 	if err := c.Get(path, &result); err != nil {
 		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), isAPIError)
 	}
+	result.Origin = resource.OriginStore.String()
 	return result, nil
 }
 
