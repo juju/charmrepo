@@ -5,6 +5,7 @@ import (
 	"github.com/juju/testing/filetesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 
 	"gopkg.in/juju/charmrepo.v2-unstable/testing"
 )
@@ -179,4 +180,71 @@ func (*testCharmSuite) TestNewCharm(c *gc.C) {
 		test.expectFiles.Check(c, dir)
 
 	}
+}
+
+func (*testCharmSuite) TestMetaWithRelations(c *gc.C) {
+	m := testing.MetaWithRelations(
+		nil,
+		"provides foo aninterface",
+		"provides bar another",
+		"requires blah more",
+		"requires a b",
+		"provides c d",
+	)
+	c.Assert(m, jc.DeepEquals, &charm.Meta{
+		Provides: map[string]charm.Relation{
+			"foo": {
+				Name:      "foo",
+				Scope:     charm.ScopeGlobal,
+				Interface: "aninterface",
+				Role:      charm.RoleProvider,
+			},
+			"bar": {
+				Name:      "bar",
+				Scope:     charm.ScopeGlobal,
+				Interface: "another",
+				Role:      charm.RoleProvider,
+			},
+			"c": {
+				Name:      "c",
+				Scope:     charm.ScopeGlobal,
+				Interface: "d",
+				Role:      charm.RoleProvider,
+			},
+		},
+		Requires: map[string]charm.Relation{
+			"blah": {
+				Name:      "blah",
+				Scope:     charm.ScopeGlobal,
+				Interface: "more",
+				Role:      charm.RoleRequirer,
+			},
+			"a": {
+				Name:      "a",
+				Scope:     charm.ScopeGlobal,
+				Interface: "b",
+				Role:      charm.RoleRequirer,
+			},
+		},
+	})
+}
+
+func (*testCharmSuite) TestMetaWithResources(c *gc.C) {
+	m := testing.MetaWithResources(nil, "one", "two")
+	c.Assert(m, jc.DeepEquals, &charm.Meta{
+		Resources: map[string]resource.Meta{
+			"one": {
+				Name:        "one",
+				Type:        resource.TypeFile,
+				Path:        "one-file",
+				Description: "one description",
+			},
+			"two": {
+				Name:        "two",
+				Type:        resource.TypeFile,
+				Path:        "two-file",
+				Description: "two description",
+			},
+		},
+	})
 }

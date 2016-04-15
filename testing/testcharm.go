@@ -15,7 +15,9 @@ import (
 
 	"github.com/juju/testing/filetesting"
 	gc "gopkg.in/check.v1"
+	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/yaml.v2"
 )
 
@@ -275,4 +277,91 @@ func addZipEntry(zw *zip.Writer, f filetesting.Entry) {
 			panic(err)
 		}
 	}
+}
+
+// MetaWithSupportedSeries returns m with Series
+// set to series. If m is nil, new(charm.Meta)
+// will be used instead.
+func MetaWithSupportedSeries(m *charm.Meta, series ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	m.Series = series
+	return m
+}
+
+// MetaWithRelations returns m with Provides and Requires set
+// to the given relations, where each relation
+// is specified as a white-space-separated
+// triple:
+//	role name interface
+// where role specifies the role of the interface
+// ("provides" or "requires"), name holds the relation
+// name and interface holds the interface relation type.
+//
+// If m is nil, new(charm.Meta) will be used instead.
+func MetaWithRelations(m *charm.Meta, relations ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	provides := make(map[string]charm.Relation)
+	requires := make(map[string]charm.Relation)
+	for _, rel := range relations {
+		r, err := parseRelation(rel)
+		if err != nil {
+			panic(fmt.Errorf("bad relation %q", err))
+		}
+		if r.Role == charm.RoleProvider {
+			provides[r.Name] = r
+		} else {
+			requires[r.Name] = r
+		}
+	}
+	m.Provides = provides
+	m.Requires = requires
+	return m
+}
+
+func parseRelation(s string) (charm.Relation, error) {
+	fields := strings.Fields(s)
+	if len(fields) != 3 {
+		return charm.Relation{}, errgo.Newf("wrong field count")
+	}
+	r := charm.Relation{
+		Scope:     charm.ScopeGlobal,
+		Name:      fields[1],
+		Interface: fields[2],
+	}
+	switch fields[0] {
+	case "provides":
+		r.Role = charm.RoleProvider
+	case "requires":
+		r.Role = charm.RoleRequirer
+	default:
+		return charm.Relation{}, errgo.Newf("unknown role")
+	}
+	return r, nil
+}
+
+// MetaWithResources returns m with Resources set to a set of resources
+// with the given names. If m is nil, new(charm.Meta) will be used
+// instead.
+//
+// The path and description of the resources are derived from
+// the resource name by adding a "-file" and a " description"
+// suffix respectively.
+func MetaWithResources(m *charm.Meta, resources ...string) *charm.Meta {
+	if m == nil {
+		m = new(charm.Meta)
+	}
+	m.Resources = make(map[string]resource.Meta)
+	for _, name := range resources {
+		m.Resources[name] = resource.Meta{
+			Name:        name,
+			Type:        resource.TypeFile,
+			Path:        name + "-file",
+			Description: name + " description",
+		}
+	}
+	return m
 }
