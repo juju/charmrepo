@@ -246,6 +246,12 @@ type PromulgatedResponse struct {
 	Promulgated bool
 }
 
+// CanIngestResponse holds the result of an id/meta/can-ingest GET request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacan-ingest
+type CanIngestResponse struct {
+	CanIngest bool
+}
+
 // PromulgateRequest holds the request of an id/promulgate PUT request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpromulgate
 type PromulgateRequest struct {
