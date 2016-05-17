@@ -28,7 +28,6 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
 	"gopkg.in/macaroon.v1"
 
@@ -218,10 +217,6 @@ func (c *Client) ListResources(id *charm.URL) ([]params.Resource, error) {
 	if err := c.Get("/"+id.Path()+"/meta/resources", &result); err != nil {
 		return nil, errgo.NoteMask(err, "cannot get resource metadata from the charm store", isAPIError)
 	}
-	// Set all the Origin fields appropriately.
-	for i := range result {
-		result[i].Origin = resource.OriginStore.String()
-	}
 	return result, nil
 }
 
@@ -342,7 +337,6 @@ func (c *Client) ResourceMeta(id *charm.URL, name string, revision int) (params.
 	if err := c.Get(path, &result); err != nil {
 		return result, errgo.NoteMask(err, fmt.Sprintf("cannot get %q", path), isAPIError)
 	}
-	result.Origin = resource.OriginStore.String()
 	return result, nil
 }
 
