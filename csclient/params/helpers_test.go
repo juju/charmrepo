@@ -44,7 +44,6 @@ func (HelpersSuite) TestResource2API(c *gc.C) {
 		Type:        "file",
 		Path:        "spam.tgz",
 		Description: "you need it",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: []byte(fingerprint),
 		Size:        10,
@@ -57,7 +56,6 @@ func (HelpersSuite) TestAPI2ResourceFull(c *gc.C) {
 		Type:        "file",
 		Path:        "spam.tgz",
 		Description: "you need it",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: []byte(fingerprint),
 		Size:        10,
@@ -73,7 +71,7 @@ func (HelpersSuite) TestAPI2ResourceFull(c *gc.C) {
 			Path:        "spam.tgz",
 			Description: "you need it",
 		},
-		Origin:      resource.OriginUpload,
+		Origin:      resource.OriginStore,
 		Revision:    0,
 		Fingerprint: fp,
 		Size:        10,
@@ -86,10 +84,9 @@ func (HelpersSuite) TestAPI2ResourceFull(c *gc.C) {
 
 func (HelpersSuite) TestAPI2ResourceBasic(c *gc.C) {
 	res, err := params.API2Resource(params.Resource{
-		Name:   "spam",
-		Type:   "file",
-		Path:   "spam.tgz",
-		Origin: "upload",
+		Name: "spam",
+		Type: "file",
+		Path: "spam.tgz",
 	})
 	c.Assert(err, jc.ErrorIsNil)
 
@@ -100,7 +97,7 @@ func (HelpersSuite) TestAPI2ResourceBasic(c *gc.C) {
 			Path:        "spam.tgz",
 			Description: "",
 		},
-		Origin:      resource.OriginUpload,
+		Origin:      resource.OriginStore,
 		Revision:    0,
 		Fingerprint: resource.Fingerprint{},
 		Size:        0,
@@ -118,7 +115,6 @@ func (HelpersSuite) TestAPI2ResourceNegativeRevision(c *gc.C) {
 		Path:        "spam.tgz",
 		Fingerprint: []byte(fingerprint),
 		Size:        20,
-		Origin:      "store",
 		Revision:    -1,
 	})
 
@@ -130,7 +126,6 @@ func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
 		Name:        "spam",
 		Type:        "<bogus>",
 		Path:        "spam.tgz",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: []byte(fingerprint),
 		Size:        10,
@@ -139,26 +134,11 @@ func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `unsupported resource type "<bogus>"`)
 }
 
-func (HelpersSuite) TestAPI2ResourceBadOrigin(c *gc.C) {
-	_, err := params.API2Resource(params.Resource{
-		Name:        "spam",
-		Type:        "file",
-		Path:        "spam.tgz",
-		Origin:      "<bogus>",
-		Revision:    0,
-		Fingerprint: []byte(fingerprint),
-		Size:        10,
-	})
-
-	c.Check(err, gc.ErrorMatches, `unknown origin "<bogus>"`)
-}
-
 func (HelpersSuite) TestAPI2ResourceBadFingerprint(c *gc.C) {
 	_, err := params.API2Resource(params.Resource{
 		Name:        "spam",
 		Type:        "file",
 		Path:        "spam.tgz",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: []byte(fingerprint + "1"),
 		Size:        10,
@@ -172,7 +152,6 @@ func (HelpersSuite) TestAPI2ResourceEmptyFingerprintNoSize(c *gc.C) {
 		Name:        "spam",
 		Type:        "file",
 		Path:        "spam.tgz",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: nil,
 		Size:        0,
@@ -185,7 +164,7 @@ func (HelpersSuite) TestAPI2ResourceEmptyFingerprintNoSize(c *gc.C) {
 			Type: resource.TypeFile,
 			Path: "spam.tgz",
 		},
-		Origin:      resource.OriginUpload,
+		Origin:      resource.OriginStore,
 		Revision:    0,
 		Fingerprint: resource.Fingerprint{},
 		Size:        0,
@@ -201,7 +180,6 @@ func (HelpersSuite) TestAPI2ResourceEmptyFingerprintWithSize(c *gc.C) {
 		Name:        "spam",
 		Type:        "file",
 		Path:        "spam.tgz",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: nil,
 		Size:        10,
@@ -215,7 +193,6 @@ func (HelpersSuite) TestAPI2ResourceValidateFailed(c *gc.C) {
 		Name:        "",
 		Type:        "file",
 		Path:        "spam.tgz",
-		Origin:      "upload",
 		Revision:    0,
 		Fingerprint: []byte(fingerprint),
 		Size:        10,

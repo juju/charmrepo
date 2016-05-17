@@ -15,7 +15,6 @@ func Resource2API(res resource.Resource) Resource {
 		Type:        res.Type.String(),
 		Path:        res.Path,
 		Description: res.Description,
-		Origin:      res.Origin.String(),
 		Revision:    res.Revision,
 		Fingerprint: res.Fingerprint.Bytes(),
 		Size:        res.Size,
@@ -32,15 +31,12 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 		return res, errgo.Mask(err, errgo.Any)
 	}
 
-	origin, err := resource.ParseOrigin(apiInfo.Origin)
-	if err != nil {
-		return res, errgo.Mask(err, errgo.Any)
-	}
-
 	fp, err := deserializeFingerprint(apiInfo.Fingerprint)
 	if err != nil {
 		return res, errgo.Mask(err, errgo.Any)
 	}
+
+	// Charmstore doesn't set Origin, so we just default it to OriginStore.
 
 	res = resource.Resource{
 		Meta: resource.Meta{
@@ -49,7 +45,7 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 			Path:        apiInfo.Path,
 			Description: apiInfo.Description,
 		},
-		Origin:      origin,
+		Origin:      resource.OriginStore,
 		Revision:    apiInfo.Revision,
 		Fingerprint: fp,
 		Size:        apiInfo.Size,
