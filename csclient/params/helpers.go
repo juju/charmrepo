@@ -31,12 +31,19 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 		return res, errgo.Mask(err, errgo.Any)
 	}
 
+	// An unset origin is treated the same as OriginStore.
+	origin := resource.OriginStore
+	if apiInfo.Origin != "" {
+		origin, err = resource.ParseOrigin(apiInfo.Origin)
+		if err != nil {
+			return res, errgo.Mask(err, errgo.Any)
+		}
+	}
+
 	fp, err := deserializeFingerprint(apiInfo.Fingerprint)
 	if err != nil {
 		return res, errgo.Mask(err, errgo.Any)
 	}
-
-	// Charmstore doesn't set Origin, so we just default it to OriginStore.
 
 	res = resource.Resource{
 		Meta: resource.Meta{
@@ -45,7 +52,7 @@ func API2Resource(apiInfo Resource) (resource.Resource, error) {
 			Path:        apiInfo.Path,
 			Description: apiInfo.Description,
 		},
-		Origin:      resource.OriginStore,
+		Origin:      origin,
 		Revision:    apiInfo.Revision,
 		Fingerprint: fp,
 		Size:        apiInfo.Size,

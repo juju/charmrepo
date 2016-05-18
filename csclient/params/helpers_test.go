@@ -134,6 +134,20 @@ func (HelpersSuite) TestAPI2ResourceBadType(c *gc.C) {
 	c.Check(err, gc.ErrorMatches, `unsupported resource type "<bogus>"`)
 }
 
+func (HelpersSuite) TestAPI2ResourceBadOrigin(c *gc.C) {
+	_, err := params.API2Resource(params.Resource{
+		Name:        "spam",
+		Type:        "file",
+		Path:        "spam.tgz",
+		Origin:      "<bogus>",
+		Revision:    0,
+		Fingerprint: []byte(fingerprint),
+		Size:        10,
+	})
+
+	c.Check(err, gc.ErrorMatches, `unknown origin "<bogus>"`)
+}
+
 func (HelpersSuite) TestAPI2ResourceBadFingerprint(c *gc.C) {
 	_, err := params.API2Resource(params.Resource{
 		Name:        "spam",
