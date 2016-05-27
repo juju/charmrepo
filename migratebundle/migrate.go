@@ -1,4 +1,4 @@
-package migratebundle // import "gopkg.in/juju/charmrepo.v2-unstable/migratebundle"
+package migratebundle
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 )
 
 // legacyBundle represents an old-style bundle.
@@ -60,6 +60,8 @@ type legacyService struct {
 // - A relation clause with multiple targets is expanded
 // into multiple relation clauses.
 //
+// - "services" section is renamed to "applications"
+//
 // The isSubordinate argument is used to find out whether a charm is a subordinate.
 func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.URL) (bool, error)) (map[string]*charm.BundleData, error) {
 	var bundles map[string]*legacyBundle
@@ -84,10 +86,10 @@ func Migrate(bundlesYAML []byte, isSubordinate func(id *charm.URL) (bool, error)
 
 func migrate(b *legacyBundle, isSubordinate func(id *charm.URL) (bool, error)) (*charm.BundleData, error) {
 	data := &charm.BundleData{
-		Services: make(map[string]*charm.ServiceSpec),
-		Series:   b.Series,
-		Machines: make(map[string]*charm.MachineSpec),
-		Tags:     b.Tags,
+		Applications: make(map[string]*charm.ApplicationSpec),
+		Series:       b.Series,
+		Machines:     make(map[string]*charm.MachineSpec),
+		Tags:         b.Tags,
 	}
 	for name, svc := range b.Services {
 		if svc == nil {
@@ -113,7 +115,7 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.URL) (bool, error)) (
 				numUnits = 1
 			}
 		}
-		newSvc := &charm.ServiceSpec{
+		newApplication := &charm.ApplicationSpec{
 			Charm:       charmId,
 			NumUnits:    numUnits,
 			Expose:      svc.Expose,
@@ -138,9 +140,9 @@ func migrate(b *legacyBundle, isSubordinate func(id *charm.URL) (bool, error)) (
 					data.Machines[place.Machine] = new(charm.MachineSpec)
 				}
 			}
-			newSvc.To = to
+			newApplication.To = to
 		}
-		data.Services[name] = newSvc
+		data.Applications[name] = newApplication
 	}
 	var err error
 	data.Relations, err = expandRelations(b.Relations)

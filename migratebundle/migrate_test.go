@@ -16,7 +16,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmrepo.v2-unstable"
 )
@@ -119,7 +119,7 @@ var migrateTests = []struct {
 		"wordpress-simple": {
 			Series: "precise",
 			Tags:   []string{"foo", "bar"},
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "cs:precise/wordpress-20",
 					NumUnits: 1,
@@ -165,7 +165,7 @@ var migrateTests = []struct {
 		|`,
 	expect: map[string]*charm.BundleData{
 		"wordpress-simple": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "cs:precise/wordpress-20",
 					NumUnits: 1,
@@ -186,7 +186,7 @@ var migrateTests = []struct {
 	},
 	expect: map[string]*charm.BundleData{
 		"wordpress-simple": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm: "cs:precise/wordpress-20",
 				},
@@ -202,7 +202,7 @@ var migrateTests = []struct {
 		|`,
 	expect: map[string]*charm.BundleData{
 		"wordpress-simple": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "wordpress",
 					NumUnits: 1,
@@ -232,7 +232,7 @@ var migrateTests = []struct {
 		|`,
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress1": {
 					Charm:    "wordpress1",
 					NumUnits: 1,
@@ -273,7 +273,7 @@ var migrateTests = []struct {
 		|`,
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "wordpress",
 					To:       []string{"kvm:0"},
@@ -320,7 +320,7 @@ var migrateTests = []struct {
 	},
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:  "precise/wordpress",
 					Expose: true,
@@ -336,7 +336,7 @@ var migrateTests = []struct {
 			},
 		},
 		"base": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"logging": {
 					Charm: "precise/logging",
 				},
@@ -376,7 +376,7 @@ var migrateTests = []struct {
 	},
 	expect: map[string]*charm.BundleData{
 		"wordpress": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "precise/wordpress",
 					NumUnits: 1,
@@ -415,7 +415,7 @@ var migrateTests = []struct {
 	`,
 	expect: map[string]*charm.BundleData{
 		"top": {
-			Services: map[string]*charm.ServiceSpec{
+			Applications: map[string]*charm.ApplicationSpec{
 				"wordpress": {
 					Charm:    "cs:precise/wordpress",
 					NumUnits: 3,
@@ -495,7 +495,7 @@ func (*migrateSuite) TestMigrateAll(c *gc.C) {
 func checkBundleData(c *gc.C, bd *charm.BundleData) bool {
 	charms := make(map[string]charm.Charm)
 	ok := true
-	for _, svc := range bd.Services {
+	for _, svc := range bd.Applications {
 		id, err := charm.ParseURL(svc.Charm)
 		if err != nil {
 			ok = false
