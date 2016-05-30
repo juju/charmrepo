@@ -11,7 +11,7 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/yaml.v1"
+	"gopkg.in/yaml.v2"
 
 	"gopkg.in/juju/charmrepo.v2-unstable"
 )
@@ -90,7 +90,7 @@ func (s *bundlePathSuite) TestGetBundleSymlink(c *gc.C) {
 func (s *bundlePathSuite) TestGetBundleLocalFile(c *gc.C) {
 	bundlePath := filepath.Join(c.MkDir(), "mybundle")
 	data := `
-services:
+applications:
   wordpress:
     charm: wordpress
     num_units: 1

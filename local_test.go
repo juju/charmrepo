@@ -104,6 +104,7 @@ func (s *LocalRepoSuite) TestLogsErrors(c *gc.C) {
 .* WARNING juju.charm.charmrepo failed to load charm at ".*/quantal/blah": .*
 .* WARNING juju.charm.charmrepo failed to load charm at ".*/quantal/blah.charm": .*
 .* WARNING juju.charm.charmrepo failed to load charm at ".*/quantal/upgrade2": .*
+.* line 1: cannot unmarshal.*
 `[1:])
 }
 
