@@ -484,6 +484,8 @@ func (s *charmStoreRepoSuite) TestResolveWithChannelEquivalentToResolve(c *gc.C)
 }
 
 func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
+	// TODO frankban: update these tests once the charm store is updated to use
+	// the edge channel.
 	tests := []struct {
 		clientChannel params.Channel
 		published     []params.Channel
