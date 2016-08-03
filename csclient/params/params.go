@@ -35,8 +35,15 @@ const (
 type Channel string
 
 const (
-	// DevelopmentChannel is the channel used for charms or bundles under development.
-	DevelopmentChannel Channel = "development"
+	// EdgeChannel is the channel used for charms or bundles under development.
+	EdgeChannel Channel = "edge"
+
+	// BetaChannel is the channel used for beta charms or bundles.
+	BetaChannel Channel = "beta"
+
+	// CandidateChannel is the channel used for charms or bundles release
+	// candidates.
+	CandidateChannel Channel = "candidate"
 
 	// StableChannel is the channel used for stable charms or bundles.
 	StableChannel Channel = "stable"
@@ -46,6 +53,9 @@ const (
 
 	// NoChannel represents where no channel has been specifically requested.
 	NoChannel Channel = ""
+
+	// DevelopmentChannel is only defined for backward compatibility.
+	DevelopmentChannel Channel = EdgeChannel
 )
 
 // MetaAnyResponse holds the result of a meta/any request.
