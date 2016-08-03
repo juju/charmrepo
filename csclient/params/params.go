@@ -55,7 +55,7 @@ const (
 	NoChannel Channel = ""
 
 	// DevelopmentChannel is only defined for backward compatibility.
-	DevelopmentChannel Channel = EdgeChannel
+	DevelopmentChannel Channel = "development"
 )
 
 // MetaAnyResponse holds the result of a meta/any request.
