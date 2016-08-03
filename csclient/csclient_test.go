@@ -1183,8 +1183,8 @@ func (s *suite) TestWithChannel(c *gc.C) {
 	}
 
 	c.Assert(makeRequest(client), gc.Equals, "")
-	devClient := client.WithChannel(params.EdgeChannel)
-	c.Assert(makeRequest(devClient), gc.Equals, "channel="+string(params.EdgeChannel))
+	devClient := client.WithChannel(params.DevelopmentChannel)
+	c.Assert(makeRequest(devClient), gc.Equals, "channel=development")
 	// Ensure the original client has not been mutated.
 	c.Assert(makeRequest(client), gc.Equals, "")
 }
@@ -1606,10 +1606,8 @@ func (s *suite) TestPublish(c *gc.C) {
 	url, err := s.client.UploadCharm(id, ch)
 	c.Assert(err, gc.IsNil)
 
-	// Have to make a new repo from the client, since the embedded repo is not
+	// have to make a new repo from the client, since the embedded repo is not
 	// authenticated.
-	// TODO frankban: once the charm store is updated with the edge channel,
-	// fix this test so that it uses that.
 	err = s.client.Publish(url, []params.Channel{params.DevelopmentChannel}, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
