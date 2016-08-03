@@ -267,7 +267,7 @@ func bestChannel(client *csclient.Client, published []params.PublishedInfo) para
 		case params.StableChannel:
 			bestChannel = info.Channel
 			break
-		case params.EdgeChannel, params.DevelopmentChannel:
+		case params.EdgeChannel:
 			bestChannel = info.Channel
 		default:
 			panic(fmt.Sprintf("unknown channel %q", info.Channel))
