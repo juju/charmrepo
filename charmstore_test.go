@@ -484,8 +484,6 @@ func (s *charmStoreRepoSuite) TestResolveWithChannelEquivalentToResolve(c *gc.C)
 }
 
 func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
-	// TODO frankban: update these tests once the charm store is updated to use
-	// the edge channel.
 	tests := []struct {
 		clientChannel params.Channel
 		published     []params.Channel
@@ -494,8 +492,8 @@ func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
 		clientChannel: params.StableChannel,
 		expected:      params.StableChannel,
 	}, {
-		clientChannel: params.DevelopmentChannel,
-		expected:      params.DevelopmentChannel,
+		clientChannel: params.EdgeChannel,
+		expected:      params.EdgeChannel,
 	}, {
 		clientChannel: params.UnpublishedChannel,
 		expected:      params.UnpublishedChannel,
@@ -506,22 +504,22 @@ func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
 		published: []params.Channel{params.StableChannel},
 		expected:  params.StableChannel,
 	}, {
-		published: []params.Channel{params.DevelopmentChannel},
-		expected:  params.DevelopmentChannel,
+		published: []params.Channel{params.EdgeChannel},
+		expected:  params.EdgeChannel,
 	}, {
-		published: []params.Channel{params.StableChannel, params.DevelopmentChannel},
+		published: []params.Channel{params.StableChannel, params.EdgeChannel},
 		expected:  params.StableChannel,
 	}, {
-		published: []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		published: []params.Channel{params.EdgeChannel, params.StableChannel},
 		expected:  params.StableChannel,
 	}, {
 		clientChannel: params.StableChannel,
-		published:     []params.Channel{params.DevelopmentChannel, params.StableChannel},
+		published:     []params.Channel{params.EdgeChannel, params.StableChannel},
 		expected:      params.StableChannel,
 	}, {
-		clientChannel: params.DevelopmentChannel,
-		published:     []params.Channel{params.StableChannel, params.DevelopmentChannel},
-		expected:      params.DevelopmentChannel,
+		clientChannel: params.EdgeChannel,
+		published:     []params.Channel{params.StableChannel, params.EdgeChannel},
+		expected:      params.EdgeChannel,
 	}, {
 		clientChannel: params.UnpublishedChannel,
 		published:     []params.Channel{params.StableChannel},

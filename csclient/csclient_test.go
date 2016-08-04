@@ -1608,12 +1608,10 @@ func (s *suite) TestPublish(c *gc.C) {
 
 	// Have to make a new repo from the client, since the embedded repo is not
 	// authenticated.
-	// TODO frankban: once the charm store is updated with the edge channel,
-	// fix this test so that it uses that.
-	err = s.client.Publish(url, []params.Channel{params.DevelopmentChannel}, nil)
+	err = s.client.Publish(url, []params.Channel{params.EdgeChannel}, nil)
 	c.Assert(err, jc.ErrorIsNil)
 
-	client := s.client.WithChannel(params.DevelopmentChannel)
+	client := s.client.WithChannel(params.EdgeChannel)
 	err = client.Get("/"+url.Path()+"/meta/id", nil)
 	c.Assert(err, jc.ErrorIsNil)
 
