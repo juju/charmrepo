@@ -259,19 +259,11 @@ func bestChannel(client *csclient.Client, published []params.PublishedInfo) para
 	if explicitChannel != params.NoChannel {
 		return explicitChannel
 	}
-
-	bestChannel := params.UnpublishedChannel
-	for _, info := range published {
-		// TODO(ericsnow) Favor the one with info.Current == true?
-		switch info.Channel {
-		case params.StableChannel:
-			bestChannel = info.Channel
-			break
-		case params.EdgeChannel:
-			bestChannel = info.Channel
-		default:
-			panic(fmt.Sprintf("unknown channel %q", info.Channel))
-		}
+	if len(published) == 0 {
+		return params.UnpublishedChannel
 	}
-	return bestChannel
+	// Note the the meta/published endpoint return results in stability level
+	// order. For instance, the stable channel comes first, then candidate etc.
+	// TODO(ericsnow) Favor the one with info.Current == true?
+	return published[0].Channel
 }

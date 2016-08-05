@@ -513,6 +513,9 @@ func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
 		published: []params.Channel{params.EdgeChannel, params.StableChannel},
 		expected:  params.StableChannel,
 	}, {
+		published: []params.Channel{params.EdgeChannel, params.BetaChannel, params.CandidateChannel},
+		expected:  params.CandidateChannel,
+	}, {
 		clientChannel: params.StableChannel,
 		published:     []params.Channel{params.EdgeChannel, params.StableChannel},
 		expected:      params.StableChannel,
@@ -524,6 +527,10 @@ func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
 		clientChannel: params.UnpublishedChannel,
 		published:     []params.Channel{params.StableChannel},
 		expected:      params.UnpublishedChannel,
+	}, {
+		clientChannel: params.CandidateChannel,
+		published:     []params.Channel{params.EdgeChannel, params.CandidateChannel, params.StableChannel},
+		expected:      params.CandidateChannel,
 	}}
 
 	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
