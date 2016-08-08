@@ -58,6 +58,25 @@ const (
 	DevelopmentChannel Channel = "development"
 )
 
+// OrderedChannels holds the list of valid channels in order of publishing
+// status, most stable first.
+var OrderedChannels = []Channel{
+	StableChannel,
+	CandidateChannel,
+	BetaChannel,
+	EdgeChannel,
+	UnpublishedChannel,
+}
+
+// ValidChannels holds the set of all allowed channels for an entity.
+var ValidChannels = func() map[Channel]bool {
+	channels := make(map[Channel]bool, len(OrderedChannels))
+	for _, ch := range OrderedChannels {
+		channels[ch] = true
+	}
+	return channels
+}()
+
 // MetaAnyResponse holds the result of a meta/any request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
 type MetaAnyResponse EntityResult
