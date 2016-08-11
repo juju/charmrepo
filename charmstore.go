@@ -12,6 +12,7 @@ import (
 	"net/url"
 	"os"
 	"path/filepath"
+	"sort"
 
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
@@ -262,8 +263,41 @@ func bestChannel(client *csclient.Client, published []params.PublishedInfo) para
 	if len(published) == 0 {
 		return params.UnpublishedChannel
 	}
-	// Note the the meta/published endpoint return results in stability level
+
+	// Note the the meta/published endpoint returns results in stability level
 	// order. For instance, the stable channel comes first, then candidate etc.
+	// TODO frankban: that said, while the old charm store is being used, we
+	// still need to sort them. Later, we will be able to just
+	// "return published[0].Channel" here.
 	// TODO(ericsnow) Favor the one with info.Current == true?
-	return published[0].Channel
+	channels := make([]params.Channel, len(published))
+	for i, result := range published {
+		channels[i] = result.Channel
+	}
+	sortChannels(channels)
+	return channels[0]
 }
+
+// oldChannels maps old charm store channels with their stability level.
+var oldChannels = map[params.Channel]int{
+	params.StableChannel:      1,
+	params.DevelopmentChannel: 2,
+	params.UnpublishedChannel: 3,
+}
+
+// sortChannels sorts the given channels by stability level, most stable first.
+func sortChannels(channels []params.Channel) {
+	for _, channel := range channels {
+		if _, ok := oldChannels[channel]; !ok {
+			return
+		}
+	}
+	// All channels are old: sort in legacy order.
+	sort.Sort(orderedOldChannels(channels))
+}
+
+type orderedOldChannels []params.Channel
+
+func (o orderedOldChannels) Len() int           { return len(o) }
+func (o orderedOldChannels) Swap(i, j int)      { o[i], o[j] = o[j], o[i] }
+func (o orderedOldChannels) Less(i, j int) bool { return oldChannels[o[i]] < oldChannels[o[j]] }
