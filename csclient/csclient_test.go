@@ -50,11 +50,12 @@ var fakeContent, fakeHash, fakeSize = func() (string, string, int64) {
 
 type suite struct {
 	jujutesting.IsolatedMgoSuite
-	client       *csclient.Client
-	srv          *httptest.Server
-	handler      charmstore.HTTPCloseHandler
-	serverParams charmstore.ServerParams
-	discharge    func(cond, arg string) ([]checkers.Caveat, error)
+	client          *csclient.Client
+	srv             *httptest.Server
+	handler         charmstore.HTTPCloseHandler
+	serverParams    charmstore.ServerParams
+	discharge       func(cond, arg string) ([]checkers.Caveat, error)
+	termsDischarger *termsDischarger
 }
 
 var _ = gc.Suite(&suite{})
@@ -84,11 +85,15 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 		return s.discharge(cond, arg)
 	})
 
+	s.termsDischarger = &termsDischarger{}
+	termsDischarger := bakerytest.NewDischarger(nil, s.termsDischarger.thirdPartyChecker)
+
 	serverParams := charmstore.ServerParams{
 		AuthUsername:     "test-user",
 		AuthPassword:     "test-password",
 		IdentityLocation: discharger.Service.Location(),
-		PublicKeyLocator: discharger,
+		PublicKeyLocator: httpbakery.NewPublicKeyRing(httpbakery.NewHTTPClient(), nil),
+		TermsLocation:    termsDischarger.Service.Location(),
 	}
 
 	db := session.DB("charmstore")
@@ -534,6 +539,36 @@ func (s *suite) TestGetArchiveErrorNotFound(c *gc.C) {
 	c.Assert(id, gc.IsNil)
 	c.Assert(hash, gc.Equals, "")
 	c.Assert(size, gc.Equals, int64(0))
+}
+
+func (s *suite) TestGetArchiveTermAgreementRequired(c *gc.C) {
+	ch := charmRepo.CharmArchive(c.MkDir(), "terms1")
+
+	url := charm.MustParseURL("~charmers/utopic/terms1-1")
+	err := s.client.UploadCharmWithRevision(url, ch, 1)
+	c.Assert(err, jc.ErrorIsNil)
+	s.setPublic(c, url)
+
+	client := csclient.New(csclient.Params{
+		URL: s.srv.URL,
+	})
+	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
+		return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice")}, nil
+	}
+
+	_, _, _, _, err = client.GetArchive(url)
+	c.Assert(err, gc.ErrorMatches, `cannot get archive because some terms have not been agreed to. Try "juju agree term1/1 term3/1"`)
+
+	// user agrees to the following terms.
+	s.termsDischarger.agreedTerms = map[string]bool{
+		"term1/1": true,
+		"term2/1": true,
+		"term3/1": true,
+	}
+
+	// try to get the archive again.
+	_, _, _, _, err = client.GetArchive(url)
+	c.Assert(err, jc.ErrorIsNil)
 }
 
 var getArchiveWithBadResponseTests = []struct {
@@ -1877,4 +1912,29 @@ type dischargeAcquirerFunc func(firstPartyLocation string, cav macaroon.Caveat) 
 
 func (f dischargeAcquirerFunc) AcquireDischarge(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
 	return f(firstPartyLocation, cav)
+}
+
+// mockTermsService mocks out the functionality of the terms service for testing
+// purposes.
+type termsDischarger struct {
+	agreedTerms map[string]bool
+}
+
+func (m *termsDischarger) thirdPartyChecker(_ *http.Request, cond, args string) ([]checkers.Caveat, error) {
+	terms := strings.Fields(args)
+
+	if cond != "has-agreed" {
+		return nil, errgo.Newf("caveat not recognized %v", cond)
+	}
+
+	needsAgreement := []string{}
+	for _, term := range terms {
+		if !m.agreedTerms[term] {
+			needsAgreement = append(needsAgreement, term)
+		}
+	}
+	if len(needsAgreement) == 0 {
+		return []checkers.Caveat{}, nil
+	}
+	return nil, &httpbakery.Error{Code: "term agreement required", Message: fmt.Sprintf("term agreement required: %s", strings.Join(needsAgreement, " "))}
 }
