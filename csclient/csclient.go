@@ -157,10 +157,13 @@ func (c *Client) SetHTTPHeader(header http.Header) {
 // reader its data can be read from, the fully qualified id of the
 // corresponding entity, the hex-encoded SHA384 hash of the data and its size.
 func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, hash string, size int64, err error) {
+	fail := func(err error) (io.ReadCloser, *charm.URL, string, int64, error) {
+		return nil, nil, "", 0, err
+	}
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
-		return nil, nil, "", 0, errgo.Notef(err, "cannot make new request")
+		return fail(errgo.Notef(err, "cannot make new request"))
 	}
 
 	// Send the request.
@@ -174,37 +177,42 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	}
 	resp, err := c.Do(req, u.String())
 	if err != nil {
-		return nil, nil, "", 0, errgo.NoteMask(err, "cannot get archive", isAPIError)
+		terr := params.MaybeTermsAgreementError(err)
+		if err1, ok := errgo.Cause(terr).(*params.TermAgreementRequiredError); ok {
+			terms := strings.Join(err1.Terms, " ")
+			return fail(errgo.Newf(`cannot get archive because some terms have not been agreed to. Try "juju agree %s"`, terms))
+		}
+		return fail(errgo.NoteMask(err, "cannot get archive", isAPIError))
 	}
 
 	// Validate the response headers.
 	entityId := resp.Header.Get(params.EntityIdHeader)
 	if entityId == "" {
 		resp.Body.Close()
-		return nil, nil, "", 0, errgo.Newf("no %s header found in response", params.EntityIdHeader)
+		return fail(errgo.Newf("no %s header found in response", params.EntityIdHeader))
 	}
 	eid, err = charm.ParseURL(entityId)
 	if err != nil {
 		// The server did not return a valid id.
 		resp.Body.Close()
-		return nil, nil, "", 0, errgo.Notef(err, "invalid entity id found in response")
+		return fail(errgo.Notef(err, "invalid entity id found in response"))
 	}
 	if eid.Revision == -1 {
 		// The server did not return a fully qualified entity id.
 		resp.Body.Close()
-		return nil, nil, "", 0, errgo.Newf("archive get returned not fully qualified entity id %q", eid)
+		return fail(errgo.Newf("archive get returned not fully qualified entity id %q", eid))
 	}
 	hash = resp.Header.Get(params.ContentHashHeader)
 	if hash == "" {
 		resp.Body.Close()
-		return nil, nil, "", 0, errgo.Newf("no %s header found in response", params.ContentHashHeader)
+		return fail(errgo.Newf("no %s header found in response", params.ContentHashHeader))
 	}
 
 	// Validate the response contents.
 	if resp.ContentLength < 0 {
 		// TODO frankban: handle the case the contents are chunked.
 		resp.Body.Close()
-		return nil, nil, "", 0, errgo.Newf("no content length found in response")
+		return fail(errgo.Newf("no content length found in response"))
 	}
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }

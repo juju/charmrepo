@@ -5,6 +5,10 @@ package params // import "gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
 import (
 	"fmt"
+	"strings"
+
+	"gopkg.in/errgo.v1"
+	"gopkg.in/macaroon-bakery.v1/httpbakery"
 )
 
 // ErrorCode holds the class of an error in machine-readable format.
@@ -80,4 +84,37 @@ func (e *Error) Cause() error {
 		return e.Code
 	}
 	return nil
+}
+
+// TermAgreementRequiredError signals that the user
+// needs to agree to a set of terms and agreements
+// in order to complete an operation.
+type TermAgreementRequiredError struct {
+	Terms []string
+}
+
+// Error implements the error interface.
+func (e *TermAgreementRequiredError) Error() string {
+	return fmt.Sprintf("term agreement required %q", strings.Join(e.Terms, " "))
+}
+
+// MaybeTermsAgreementError returns err as a *TermAgreementRequiredError
+// if it has a "terms agreement required" error code, otherwise
+// it returns err unchanged.
+func MaybeTermsAgreementError(err error) error {
+	const code = "term agreement required"
+	e, ok := errgo.Cause(err).(*httpbakery.DischargeError)
+	if !ok || e.Reason == nil || e.Reason.Code != code {
+		return err
+	}
+	// Terms are guaranteed not to contain colon characters, so
+	// there's no ambiguity when finding where the listed terms start.
+	magicMarker := code + ":"
+	index := strings.LastIndex(e.Reason.Message, magicMarker)
+	if index == -1 {
+		return err
+	}
+	return &TermAgreementRequiredError{
+		Terms: strings.Fields(e.Reason.Message[index+len(magicMarker):]),
+	}
 }
