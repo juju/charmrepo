@@ -1687,7 +1687,6 @@ func (s *suite) TestUploadResource(c *gc.C) {
 
 		expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(data)))
 		c.Assert(getResult.Hash, gc.Equals, expectHash)
-		c.Assert(getResult.Size, gc.Equals, int64(len(data)))
 
 		gotData, err := ioutil.ReadAll(getResult)
 		c.Assert(err, jc.ErrorIsNil)

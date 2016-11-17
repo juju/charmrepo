@@ -284,12 +284,11 @@ func (s *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 type ResourceData struct {
 	io.ReadCloser
 	Hash string
-	Size int64
 }
 
 // GetResource retrieves byes of the resource with the given name and revision
 // for the given charm, returning a reader its data can be read from,  the
-// SHA384 hash of the data and its size.
+// SHA384 hash of the data.
 //
 // Note that the result must be closed after use.
 func (c *Client) GetResource(id *charm.URL, name string, revision int) (result ResourceData, err error) {
@@ -322,14 +321,9 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 		return result, errgo.Newf("no %s header found in response", params.ContentHashHeader)
 	}
 
-	// Validate the response contents.
-	if resp.ContentLength < 0 {
-		return result, errgo.Newf("no content length found in response")
-	}
 	return ResourceData{
 		ReadCloser: resp.Body,
 		Hash:       hash,
-		Size:       resp.ContentLength,
 	}, nil
 }
 
