@@ -449,3 +449,25 @@ type SetAuthCookie struct {
 	// Macaroons holds a slice of macaroons.
 	Macaroons macaroon.Slice
 }
+
+// UploadIdResponse holds the upload id response from a POST request to /upload.
+type UploadIdResponse struct {
+	UploadId string
+}
+
+// Parts holds a list of all the parts that are required by a multipart
+// upload, as required by a PUT request to /upload/$upload-id.
+type Parts struct {
+	Parts []Part
+}
+
+// Part represents one part of a multipart blob.
+type Part struct {
+	Hash string
+}
+
+// FinishUploadResponse holds the response to a put /upload/upload-id/part-number request.
+type FinishUploadResponse struct {
+	// hash of the complete blob.
+	Hash string
+}
