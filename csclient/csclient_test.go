@@ -30,6 +30,7 @@ import (
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	httpbakery2 "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
@@ -92,7 +93,7 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 		AuthUsername:     "test-user",
 		AuthPassword:     "test-password",
 		IdentityLocation: discharger.Service.Location(),
-		PublicKeyLocator: httpbakery.NewPublicKeyRing(httpbakery.NewHTTPClient(), nil),
+		PublicKeyLocator: httpbakery2.NewPublicKeyRing(httpbakery2.NewHTTPClient(), nil),
 		TermsLocation:    termsDischarger.Service.Location(),
 	}
 
@@ -198,7 +199,7 @@ func (s *suite) TestIsAuthorizationError(c *gc.C) {
 		return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice")}, nil
 	}
 	err = doSomething()
-	c.Assert(err, gc.ErrorMatches, `cannot post archive: unauthorized: access denied for user "alice"`)
+	c.Assert(err, gc.ErrorMatches, `cannot post archive: access denied for user "alice"`)
 	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError)
 
 	err = &params.Error{

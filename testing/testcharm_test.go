@@ -56,7 +56,6 @@ metrics:
 	},
 	expectMeta: &charm.Meta{
 		Name:        "mysql",
-		Format:      1,
 		Summary:     "Database engine",
 		Description: "A pretty popular database",
 		Provides: map[string]charm.Relation{
@@ -137,7 +136,6 @@ description: description
 		Name:        "mycharm",
 		Summary:     "summary",
 		Description: "description",
-		Format:      1,
 	},
 	expectConfig: &charm.Config{
 		Options: map[string]charm.Option{},
