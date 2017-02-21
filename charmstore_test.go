@@ -598,6 +598,40 @@ func (s *charmStoreRepoSuite) TestSortChannels(c *gc.C) {
 	}
 }
 
+func (s *charmStoreRepoSuite) TestTempCharmStore(c *gc.C) {
+	_, url := s.addCharm(c, "~who/trusty/mysql-42", "mysql")
+	client := csclient.New(csclient.Params{URL: csclient.ServerURL})
+
+	repo, err := charmrepo.NewTempCharmStore(client)
+	c.Assert(err, jc.ErrorIsNil)
+	defer repo.Cleanup()
+
+	tempCache := charmrepo.GetCacheDir(c, repo)
+	globalCache := charmrepo.GetCacheDir(c, s.repo)
+	c.Assert(tempCache, gc.Not(gc.Equals), globalCache)
+
+	_, err = repo.Get(url)
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertFileCount(c, tempCache, 1)
+	assertFileCount(c, globalCache, 0)
+
+	err = repo.Cleanup()
+	c.Assert(err, jc.ErrorIsNil)
+	_, err = os.Stat(tempCache)
+	c.Assert(err, jc.Satisfies, os.IsNotExist)
+}
+
+func assertFileCount(c *gc.C, directory string, expectedCount int) {
+	files, err := ioutil.ReadDir(directory)
+	c.Assert(err, jc.ErrorIsNil)
+	names := make([]string, len(files))
+	for i, file := range files {
+		names[i] = file.Name()
+	}
+	c.Assert(names, gc.HasLen, expectedCount)
+}
+
 // hashOfCharm returns the SHA256 hash sum for the given charm name.
 func hashOfCharm(c *gc.C, name string) string {
 	path := TestCharms.CharmArchivePath(c.MkDir(), name)

@@ -29,7 +29,8 @@ var CacheDir string
 // CharmStore is a repository Interface that provides access to the public Juju
 // charm store.
 type CharmStore struct {
-	client *csclient.Client
+	client   *csclient.Client
+	cacheDir string
 }
 
 var _ Interface = (*CharmStore)(nil)
@@ -93,6 +94,22 @@ func NewCharmStoreFromClient(client *csclient.Client) *CharmStore {
 	}
 }
 
+// NewTempCharmStore creates and returns a temporary charm store that
+// uses its own private cache instead of the global charm
+// cache. Cleanup should be called on the store when the client is
+// finished using it to remove the cache dir.
+func NewTempCharmStore(client *csclient.Client) (*CharmStore, error) {
+	cacheDir, err := ioutil.TempDir("", "charmcache")
+	if err != nil {
+		return nil, errgo.Mask(err, errgo.Any)
+	}
+	result := CharmStore{
+		client:   client,
+		cacheDir: cacheDir,
+	}
+	return &result, nil
+}
+
 // Client returns the charmstore client that the CharmStore
 // implementation uses under the hood.
 func (s *CharmStore) Client() *csclient.Client {
@@ -101,10 +118,6 @@ func (s *CharmStore) Client() *csclient.Client {
 
 // Get implements Interface.Get.
 func (s *CharmStore) Get(curl *charm.URL) (charm.Charm, error) {
-	// The cache location must have been previously set.
-	if CacheDir == "" {
-		panic("charm cache directory path is empty")
-	}
 	if curl.Series == "bundle" {
 		return nil, errgo.Newf("expected a charm URL, got bundle URL %q", curl)
 	}
@@ -117,10 +130,6 @@ func (s *CharmStore) Get(curl *charm.URL) (charm.Charm, error) {
 
 // GetBundle implements Interface.GetBundle.
 func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
-	// The cache location must have been previously set.
-	if CacheDir == "" {
-		panic("charm cache directory path is empty")
-	}
 	if curl.Series != "bundle" {
 		return nil, errgo.Newf("expected a bundle URL, got charm URL %q", curl)
 	}
@@ -131,14 +140,36 @@ func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 	return charm.ReadBundleArchive(path)
 }
 
+// Cleanup removes the cache directory and any charms in it.
+func (s *CharmStore) Cleanup() error {
+	return os.RemoveAll(s.cacheDir)
+}
+
+// cacheDir returns the directory that this store should save charms
+// to. If it's using the global cache directory and that hasn't been
+// created yet it will create it.
+func (s *CharmStore) getCacheDir() (string, error) {
+	if s.cacheDir != "" {
+		return s.cacheDir, nil
+	}
+	// The cache location must have been previously set.
+	if CacheDir == "" {
+		panic("charm cache directory path is empty")
+	}
+	if err := os.MkdirAll(CacheDir, 0755); err != nil {
+		return "", errgo.Notef(err, "cannot create the cache directory")
+	}
+	return CacheDir, nil
+}
+
 // archivePath returns a local path to the downloaded archive of the given
 // charm or bundle URL, storing it in CacheDir, which it creates if necessary.
 // If an archive with a matching SHA hash already exists locally, it will use
 // the local version.
 func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
-	// Prepare the cache directory and retrieve the entity archive.
-	if err := os.MkdirAll(CacheDir, 0755); err != nil {
-		return "", errgo.Notef(err, "cannot create the cache directory")
+	cacheDir, err := s.getCacheDir()
+	if err != nil {
+		return "", errgo.Mask(err, errgo.Any)
 	}
 	etype := "charm"
 	if curl.Series == "bundle" {
@@ -155,13 +186,13 @@ func (s *CharmStore) archivePath(curl *charm.URL) (string, error) {
 	defer r.Close()
 
 	// Check if the archive already exists in the cache.
-	path := filepath.Join(CacheDir, charm.Quote(id.String())+"."+etype)
+	path := filepath.Join(cacheDir, charm.Quote(id.String())+"."+etype)
 	if verifyHash384AndSize(path, expectHash, expectSize) == nil {
 		return path, nil
 	}
 
 	// Verify and save the new archive.
-	f, err := ioutil.TempFile(CacheDir, "charm-download")
+	f, err := ioutil.TempFile(cacheDir, "charm-download")
 	if err != nil {
 		return "", errgo.Notef(err, "cannot make temporary file")
 	}
