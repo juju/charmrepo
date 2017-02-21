@@ -140,9 +140,16 @@ func (s *CharmStore) GetBundle(curl *charm.URL) (charm.Bundle, error) {
 	return charm.ReadBundleArchive(path)
 }
 
-// Cleanup removes the cache directory and any charms in it.
+// Cleanup removes the cache directory and any charms in it. This is
+// primarily for temp stores, but it will work for stores that use the
+// global cache dir. Don't call it unless you want to delete that
+// cache.
 func (s *CharmStore) Cleanup() error {
-	return os.RemoveAll(s.cacheDir)
+	dir, err := s.getCacheDir()
+	if err != nil {
+		return errgo.Mask(err, errgo.Any)
+	}
+	return os.RemoveAll(dir)
 }
 
 // cacheDir returns the directory that this store should save charms
