@@ -599,8 +599,12 @@ func (s *charmStoreRepoSuite) TestSortChannels(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestTempCharmStore(c *gc.C) {
-	_, url := s.addCharm(c, "~who/trusty/mysql-42", "mysql")
-	client := csclient.New(csclient.Params{URL: csclient.ServerURL})
+	expect, url := s.addCharm(c, "trusty/mysql-0", "mysql")
+	client := csclient.New(csclient.Params{
+		URL:      s.srv.URL,
+		User:     "test-user",
+		Password: "test-password",
+	})
 
 	repo, err := charmrepo.NewTempCharmStore(client)
 	c.Assert(err, jc.ErrorIsNil)
@@ -610,8 +614,9 @@ func (s *charmStoreRepoSuite) TestTempCharmStore(c *gc.C) {
 	globalCache := charmrepo.GetCacheDir(c, s.repo)
 	c.Assert(tempCache, gc.Not(gc.Equals), globalCache)
 
-	_, err = repo.Get(url)
+	ch, err := repo.Get(url)
 	c.Assert(err, jc.ErrorIsNil)
+	checkCharm(c, ch, expect)
 
 	assertFileCount(c, tempCache, 1)
 	assertFileCount(c, globalCache, 0)
