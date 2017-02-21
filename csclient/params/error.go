@@ -24,6 +24,9 @@ func (code ErrorCode) ErrorCode() ErrorCode {
 }
 
 const (
+	// ErrOther is used as an error code when the
+	// charmstore returns an empty error code.
+	ErrOther            ErrorCode = "other charmstore error"
 	ErrNotFound         ErrorCode = "not found"
 	ErrMetadataNotFound ErrorCode = "metadata not found"
 	ErrForbidden        ErrorCode = "forbidden"
@@ -83,7 +86,7 @@ func (e *Error) Cause() error {
 	if e.Code != "" {
 		return e.Code
 	}
-	return nil
+	return ErrOther
 }
 
 // TermAgreementRequiredError signals that the user

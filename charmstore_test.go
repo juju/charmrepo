@@ -330,7 +330,9 @@ func (s *charmStoreRepoSuite) TestGetErrorCharmNotFound(c *gc.C) {
 func (s *charmStoreRepoSuite) TestGetErrorServer(c *gc.C) {
 	// Set up a server always returning errors.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
-		http.Error(w, `{"Message": "bad wolf", "Code": "bad request"}`, http.StatusBadRequest)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		w.Write([]byte(`{"Message": "bad wolf", "Code": "bad request"}`))
 	}))
 	defer srv.Close()
 

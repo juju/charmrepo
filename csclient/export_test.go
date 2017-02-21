@@ -4,6 +4,7 @@
 package csclient
 
 var (
-	Hyphenate     = hyphenate
-	UploadArchive = (*Client).uploadArchive
+	Hyphenate              = hyphenate
+	MinMultipartUploadSize = &minMultipartUploadSize
+	UploadArchive          = (*Client).uploadArchive
 )
