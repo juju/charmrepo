@@ -13,10 +13,13 @@ import (
 	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
+	"net/http/httputil"
 	neturl "net/url"
 	"os"
 	"reflect"
+	"regexp"
 	"strings"
+	"sync"
 	"time"
 
 	jujutesting "github.com/juju/testing"
@@ -90,11 +93,12 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 	termsDischarger := bakerytest.NewDischarger(nil, s.termsDischarger.thirdPartyChecker)
 
 	serverParams := charmstore.ServerParams{
-		AuthUsername:     "test-user",
-		AuthPassword:     "test-password",
-		IdentityLocation: discharger.Service.Location(),
-		PublicKeyLocator: httpbakery2.NewPublicKeyRing(httpbakery2.NewHTTPClient(), nil),
-		TermsLocation:    termsDischarger.Service.Location(),
+		AuthUsername:      "test-user",
+		AuthPassword:      "test-password",
+		IdentityLocation:  discharger.Service.Location(),
+		PublicKeyLocator:  httpbakery2.NewPublicKeyRing(httpbakery2.NewHTTPClient(), nil),
+		TermsLocation:     termsDischarger.Service.Location(),
+		MinUploadPartSize: 10,
 	}
 
 	db := session.DB("charmstore")
@@ -1040,8 +1044,11 @@ var getWithBadResponseTests = []struct {
 }, {
 	about: "badly formatted json error",
 	response: &http.Response{
-		Status:        "404 Not found",
-		StatusCode:    404,
+		Status:     "404 Not found",
+		StatusCode: 404,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
 		Proto:         "HTTP/1.0",
 		ProtoMajor:    1,
 		ProtoMinor:    0,
@@ -1054,6 +1061,9 @@ var getWithBadResponseTests = []struct {
 	response: &http.Response{
 		Status:     "404 Not found",
 		StatusCode: 404,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
 		Proto:      "HTTP/1.0",
 		ProtoMajor: 1,
 		ProtoMinor: 0,
@@ -1090,12 +1100,12 @@ func (s *suite) TestResourceMeta(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	r1content0 := "r1 content 0"
-	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content0))
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content0), int64(len(r1content0)), nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
 	r1content1 := "r1 content 1"
-	rev, err = s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content1))
+	rev, err = s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content1), int64(len(r1content1)), nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 1)
 
@@ -1349,7 +1359,7 @@ func (s *suite) TestMeta(c *gc.C) {
 		result := reflect.New(reflect.TypeOf(test.expectResult).Elem()).Interface()
 		id, err := s.client.Meta(charm.MustParseURL(test.id), result)
 		if test.expectError != "" {
-			c.Assert(err, gc.ErrorMatches, test.expectError)
+			c.Check(err, gc.ErrorMatches, test.expectError)
 			if code, ok := errgo.Cause(err).(params.ErrorCode); ok {
 				c.Assert(code, gc.Equals, test.expectErrorCode)
 			} else {
@@ -1362,6 +1372,29 @@ func (s *suite) TestMeta(c *gc.C) {
 		c.Assert(id, jc.DeepEquals, purl)
 		c.Assert(result, jc.DeepEquals, test.expectResult)
 	}
+}
+
+func (s *suite) TestPutMultiError(c *gc.C) {
+	c.ExpectFailure("multiple error return is broken")
+	ch := charmRepo.CharmDir("wordpress")
+	url := charm.MustParseURL("~charmers/utopic/wordpress-42")
+	err := s.client.UploadCharmWithRevision(url, ch, 42)
+	c.Assert(err, gc.IsNil)
+	s.setPublic(c, url)
+	err = s.client.Put("/meta/extra-info/foo", map[string]int{
+		"~charmers/utopic/wordpress-42": 56,
+		"~charmers/utopic/xxx-42":       56,
+	})
+	cause0 := errgo.Cause(err)
+	c.Assert(cause0, gc.FitsTypeOf, (*params.Error)(nil))
+	cause := cause0.(*params.Error)
+	// Instead, we get just the "multiple errors" code.
+	c.Assert(cause.ErrorInfo(), jc.DeepEquals, map[string]*params.Error{
+		"~charmers/utopic/xxx-42": &params.Error{
+			Message: `no matching charm or bundle for cs:~charmers/utopic/xxx-42`,
+			Code:    params.ErrNotFound,
+		},
+	})
 }
 
 func (s *suite) TestPutExtraInfo(c *gc.C) {
@@ -1677,7 +1710,7 @@ func (s *suite) TestUploadResource(c *gc.C) {
 	for i := 0; i < 3; i++ {
 		// Upload the resource.
 		data := fmt.Sprintf("boo!%d", i)
-		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data))
+		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data), int64(len(data)), nil)
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(rev, gc.Equals, i)
 
@@ -1693,6 +1726,161 @@ func (s *suite) TestUploadResource(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(string(gotData), gc.Equals, data)
 	}
+}
+
+func (s *suite) TestUploadLargeResource(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	content := "abcdefghijklmnopqrstuvwxyz"
+	// Upload the resource.
+	progress := &testProgress{c: c}
+	rev, err := s.client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), progress)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	// Check that we can download it OK.
+	getResult, err := s.client.GetResource(url, "resname", 0)
+	c.Assert(err, jc.ErrorIsNil)
+	defer getResult.Close()
+
+	expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	c.Assert(getResult.Hash, gc.Equals, expectHash)
+
+	gotData, err := ioutil.ReadAll(getResult)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(gotData), gc.Equals, content)
+	c.Assert(progress.Collected, jc.DeepEquals, []interface{}{
+		startProgress{},
+		transferredProgress{10},
+		transferredProgress{20},
+		transferredProgress{26},
+		finalizingProgress{},
+	})
+}
+
+func newFailProxy(serverURL string, failPattern string, failCount int) *failProxy {
+	u, err := neturl.Parse(serverURL)
+	if err != nil {
+		panic(err)
+	}
+	return &failProxy{
+		h:           httputil.NewSingleHostReverseProxy(u),
+		failCount:   failCount,
+		failPattern: regexp.MustCompile(failPattern),
+	}
+}
+
+type failProxy struct {
+	failPattern *regexp.Regexp
+	h           http.Handler
+	mu          sync.Mutex
+	failCount   int
+}
+
+func (p *failProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
+	if p.failPattern.MatchString(req.URL.Path) {
+		p.mu.Lock()
+		n := p.failCount
+		p.failCount--
+		p.mu.Unlock()
+		if n > 0 {
+			http.Error(w, "fake server error", http.StatusGatewayTimeout)
+			return
+		}
+	}
+	p.h.ServeHTTP(w, req)
+}
+
+func (s *suite) TestUploadLargeResourceProgressWhenGetting504(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	srv := httptest.NewServer(newFailProxy(s.srv.URL, "/upload/.*/1", 2))
+	client := csclient.New(csclient.Params{
+		URL:      srv.URL,
+		User:     s.serverParams.AuthUsername,
+		Password: s.serverParams.AuthPassword,
+	})
+
+	url, err := client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	content := "abcdefghijklmnopqrstuvwxyz"
+	// Upload the resource.
+	progress := &testProgress{c: c}
+	rev, err := client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), progress)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	// Check that we can download it OK.
+	getResult, err := client.GetResource(url, "resname", 0)
+	c.Assert(err, jc.ErrorIsNil)
+	defer getResult.Close()
+
+	expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	c.Assert(getResult.Hash, gc.Equals, expectHash)
+
+	gotData, err := ioutil.ReadAll(getResult)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(gotData), gc.Equals, content)
+	c.Assert(progress.Collected, jc.DeepEquals, []interface{}{
+		startProgress{},
+		transferredProgress{10},
+		transferredProgress{20},
+		errorProgress{"unexpected response status from server: 504 Gateway Timeout"},
+		transferredProgress{10},
+		transferredProgress{20},
+		errorProgress{"unexpected response status from server: 504 Gateway Timeout"},
+		transferredProgress{10},
+		transferredProgress{20},
+		transferredProgress{26},
+		finalizingProgress{},
+	})
+}
+
+func (s *suite) TestUploadLargeResourceWithHashMismatch(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	r := &readerChangingUnderfoot{
+		content: []byte("abcdefghijklmnopqrstuvwxyz"),
+	}
+	// Upload the resource.
+	_, err = s.client.UploadResource(url, "resname", "data", r, int64(len(r.content)), nil)
+	c.Assert(err, gc.ErrorMatches, `cannot upload part ".*/0": hash mismatch`)
+}
+
+func (s *suite) TestUploadTooLargeResource(c *gc.C) {
+	_, err := s.client.UploadResource(charm.MustParseURL("cs:~who/trusty/mysql"), "resname", "data", strings.NewReader(""), 1<<60, nil)
+	c.Assert(err, gc.ErrorMatches, `resource too big \(allowed \d+\.\d{3}GB\)`)
 }
 
 func (s *suite) TestListResources(c *gc.C) {
@@ -1720,12 +1908,12 @@ func (s *suite) TestListResources(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	r1content := "r1 content"
-	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content))
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content), int64(len(r1content)), nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
 	r2content := "r2 content"
-	rev, err = s.client.UploadResource(url, "r2", "data", strings.NewReader(r2content))
+	rev, err = s.client.UploadResource(url, "r2", "data", strings.NewReader(r2content), int64(len(r2content)), nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
@@ -1937,4 +2125,59 @@ func (m *termsDischarger) thirdPartyChecker(_ *http.Request, cond, args string) 
 		return []checkers.Caveat{}, nil
 	}
 	return nil, &httpbakery.Error{Code: "term agreement required", Message: fmt.Sprintf("term agreement required: %s", strings.Join(needsAgreement, " "))}
+}
+
+type testProgress struct {
+	c         *gc.C
+	Collected []interface{}
+}
+
+type startProgress struct {
+}
+
+type transferredProgress struct {
+	n int64
+}
+
+type errorProgress struct {
+	error string
+}
+
+type finalizingProgress struct {
+}
+
+func (p *testProgress) Start(uploadId string, expires time.Time) {
+	p.Collected = append(p.Collected, startProgress{})
+	p.c.Assert(uploadId, gc.NotNil)
+	p.c.Assert(expires.After(time.Now()), gc.Equals, true)
+}
+
+func (p *testProgress) Transferred(total int64) {
+	p.Collected = append(p.Collected, transferredProgress{total})
+}
+
+func (p *testProgress) Error(err error) {
+	p.Collected = append(p.Collected, errorProgress{
+		error: err.Error(),
+	})
+}
+
+func (p *testProgress) Finalizing() {
+	p.Collected = append(p.Collected, finalizingProgress{})
+}
+
+type readerChangingUnderfoot struct {
+	mu      sync.Mutex
+	content []byte
+}
+
+func (r *readerChangingUnderfoot) ReadAt(buf []byte, off int64) (int, error) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	n := copy(buf, r.content[off:])
+	// We've read the content once. Now change it to something else.
+	for i := off; i < off+int64(n); i++ {
+		r.content[i] = 'x'
+	}
+	return n, nil
 }
