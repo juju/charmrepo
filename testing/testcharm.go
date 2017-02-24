@@ -1,5 +1,5 @@
 // Copyright 2012, 2013 Canonical Ltd.
-// Licensed under the AGPLv3, see LICENCE file for details.
+// Licensed under the LGPLv3, see LICENCE file for details.
 
 package testing // import "gopkg.in/juju/charmrepo.v2-unstable/testing"
 
