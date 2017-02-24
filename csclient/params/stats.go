@@ -1,5 +1,5 @@
 // Copyright 2014 Canonical Ltd.
-// Licensed under the AGPLv3, see LICENCE file for details.
+// Licensed under the LGPLv3, see LICENCE file for details.
 
 package params // import "gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
 
