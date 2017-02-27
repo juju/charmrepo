@@ -294,8 +294,9 @@ func (c *Client) uploadSinglePartResource(id *charm.URL, name, path string, file
 
 	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
 
+	r := newProgressReader(io.NewSectionReader(file, 0, size), progress, 0)
 	// Send the request.
-	resp, err := c.DoWithBody(req, url, io.NewSectionReader(file, 0, size))
+	resp, err := c.DoWithBody(req, url, r)
 	if err != nil {
 		return 0, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
