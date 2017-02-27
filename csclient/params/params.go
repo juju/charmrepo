@@ -78,11 +78,11 @@ var ValidChannels = func() map[Channel]bool {
 }()
 
 // MetaAnyResponse holds the result of a meta/any request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaany
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaany
 type MetaAnyResponse EntityResult
 
 // ArchiveUploadResponse holds the result of a post or a put to /id/archive.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#post-idarchive
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#post-idarchive
 type ArchiveUploadResponse struct {
 	Id            *charm.URL
 	PromulgatedId *charm.URL `json:",omitempty"`
@@ -98,13 +98,13 @@ const (
 )
 
 // StatsUpdateRequest holds the parameters for a put to /stats/update.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#stats-update
 type StatsUpdateRequest struct {
 	Entries []StatsUpdateEntry
 }
 
 // StatsUpdateEntry holds an entry of the StatsUpdateRequest for a put to /stats/update.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#stats-update
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#stats-update
 type StatsUpdateEntry struct {
 	Timestamp      time.Time       // Time when the update did happen.
 	Type           StatsUpdateType // One of the constant Download, Traffic or Deploy.
@@ -120,15 +120,15 @@ type ExpandedId struct {
 
 // ArchiveSizeResponse holds the result of an
 // id/meta/archive-size GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaarchive-size
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaarchive-size
 type ArchiveSizeResponse struct {
 	Size int64
 }
 
 // HashResponse holds the result of id/meta/hash and id/meta/hash256 GET
 // requests.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetahash
-// and https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetahash256
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetahash
+// and https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetahash256
 type HashResponse struct {
 	Sum string
 }
@@ -136,20 +136,20 @@ type HashResponse struct {
 // ManifestFile holds information about a charm or bundle file.
 // A slice of ManifestFile is used as response for
 // id/meta/manifest GET requests.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetamanifest
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetamanifest
 type ManifestFile struct {
 	Name string
 	Size int64
 }
 
 // ArchiveUploadTimeResponse holds the result of an id/meta/archive-upload-time
-// GET request. See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaarchive-upload-time
+// GET request. See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaarchive-upload-time
 type ArchiveUploadTimeResponse struct {
 	UploadTime time.Time
 }
 
 // RelatedResponse holds the result of an id/meta/charm-related GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacharm-related
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacharm-related
 type RelatedResponse struct {
 	// Requires holds an entry for each interface provided by
 	// the charm, containing all charms that require that interface.
@@ -161,33 +161,33 @@ type RelatedResponse struct {
 }
 
 // RevisionInfoResponse holds the result of an id/meta/revision-info GET
-// request. See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetarevision-info
+// request. See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetarevision-info
 type RevisionInfoResponse struct {
 	Revisions []*charm.URL
 }
 
 // SupportedSeries holds the result of an id/meta/supported-series GET
-// request. See See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetasupported-series
+// request. See See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetasupported-series
 type SupportedSeriesResponse struct {
 	SupportedSeries []string
 }
 
 // BundleCount holds the result of an id/meta/bundle-unit-count
 // or bundle-machine-count GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabundle-unit-count
-// and https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetabundle-machine-count
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetabundle-unit-count
+// and https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetabundle-machine-count
 type BundleCount struct {
 	Count int
 }
 
 // TagsResponse holds the result of an id/meta/tags GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetatags
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetatags
 type TagsResponse struct {
 	Tags []string
 }
 
 // Published holds the result of a changes/published GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-changespublished
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-changespublished
 type Published struct {
 	Id          *charm.URL
 	PublishTime time.Time
@@ -222,31 +222,31 @@ type ListResponse struct {
 }
 
 // IdUserResponse holds the result of an id/meta/id-user GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid-user
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-user
 type IdUserResponse struct {
 	User string
 }
 
 // IdSeriesResponse holds the result of an id/meta/id-series GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid-series
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-series
 type IdSeriesResponse struct {
 	Series string
 }
 
 // IdNameResponse holds the result of an id/meta/id-name GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid-name
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-name
 type IdNameResponse struct {
 	Name string
 }
 
 // IdRevisionResponse holds the result of an id/meta/id-revision GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid-revision
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid-revision
 type IdRevisionResponse struct {
 	Revision int
 }
 
 // IdResponse holds the result of an id/meta/id GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaid
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaid
 type IdResponse struct {
 	Id       *charm.URL
 	User     string `json:",omitempty"`
@@ -256,45 +256,45 @@ type IdResponse struct {
 }
 
 // PermResponse holds the result of an id/meta/perm GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetaperm
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaperm
 type PermResponse struct {
 	Read  []string
 	Write []string
 }
 
 // PermRequest holds the request of an id/meta/perm PUT request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idmetaperm
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idmetaperm
 type PermRequest struct {
 	Read  []string
 	Write []string
 }
 
 // PromulgatedResponse holds the result of an id/meta/promulgated GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetapromulgated
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetapromulgated
 type PromulgatedResponse struct {
 	Promulgated bool
 }
 
 // CanIngestResponse holds the result of an id/meta/can-ingest GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacan-ingest
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-ingest
 type CanIngestResponse struct {
 	CanIngest bool
 }
 
 // CanWriteResponse holds the result of an id/meta/can-write GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacan-write
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetacan-write
 type CanWriteResponse struct {
 	CanWrite bool
 }
 
 // PromulgateRequest holds the request of an id/promulgate PUT request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpromulgate
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpromulgate
 type PromulgateRequest struct {
 	Promulgated bool
 }
 
 // PublishRequest holds the request of an id/publish PUT request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpublish
 type PublishRequest struct {
 	Channels []Channel
 	// Resources defines the resource revisions to use for the charm.
@@ -305,7 +305,7 @@ type PublishRequest struct {
 }
 
 // PublishResponse holds the result of an id/publish PUT request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpublish
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#put-idpublish
 type PublishResponse struct {
 	Id            *charm.URL
 	PromulgatedId *charm.URL `json:",omitempty"`
@@ -333,7 +333,7 @@ type PublishedInfo struct {
 }
 
 // WhoAmIResponse holds the result of a whoami GET request.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#whoami
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#whoami
 type WhoAmIResponse struct {
 	User   string
 	Groups []string
@@ -406,7 +406,7 @@ type Log struct {
 
 // LogResponse represents a single log message and is used in the responses
 // to /log GET requests.
-// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-log
+// See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-log
 type LogResponse struct {
 	// Data holds the log message as a JSON-encoded value.
 	Data json.RawMessage
