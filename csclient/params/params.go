@@ -281,6 +281,12 @@ type CanIngestResponse struct {
 	CanIngest bool
 }
 
+// CanWriteResponse holds the result of an id/meta/can-write GET request.
+// See https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmetacan-write
+type CanWriteResponse struct {
+	CanWrite bool
+}
+
 // PromulgateRequest holds the request of an id/promulgate PUT request.
 // See https://github.com/juju/charmstore/blob/v4/docs/API.md#put-idpromulgate
 type PromulgateRequest struct {
@@ -478,11 +484,12 @@ type Parts struct {
 
 // Part represents one part of a multipart blob.
 type Part struct {
+	// Hash holds the SHA384 hash of the part (hex-encoded)
 	Hash string
 }
 
 // FinishUploadResponse holds the response to a put /upload/upload-id/part-number request.
 type FinishUploadResponse struct {
-	// hash of the complete blob.
+	// Hash holds the SHA384 hash of the complete blob. (hex-encoded)
 	Hash string
 }
