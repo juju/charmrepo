@@ -457,24 +457,8 @@ type SetAuthCookie struct {
 }
 
 // NewUploadResponse holds the response from a POST request to /upload.
-type NewUploadResponse struct {
-	// UploadId holds the id of the upload.
-	UploadId string
-
-	// Expires holds when the upload id expires.
-	Expires time.Time
-
-	// MinPartSize holds the minimum size of a part that may
-	// be uploaded (not including the last part).
-	MinPartSize int64
-
-	// MaxPartSize holds the maximum size of a part that may
-	// be uploaded.
-	MaxPartSize int64
-
-	// MaxParts holds the maximum number of parts.
-	MaxParts int
-}
+// TODO remove this when the charmstore code no longer requires it.
+type NewUploadResponse UploadInfoResponse
 
 // Parts holds a list of all the parts that are required by a multipart
 // upload, as required by a PUT request to /upload/$upload-id.
@@ -488,6 +472,9 @@ type Part struct {
 	Hash string
 	// Size holds the size of the part.
 	Size int64
+	// Offset holds the offset of the part from the start
+	// of the file.
+	Offset int64
 	// Complete holds whether the part has been
 	// successfully uploaded.
 	Complete bool
@@ -501,6 +488,9 @@ type FinishUploadResponse struct {
 
 // UploadInfoResponse holds the response to a get /upload/upload-id request.
 type UploadInfoResponse struct {
+	// UploadId holds the id of the upload.
+	UploadId string
+
 	// Parts holds all the known parts of the upload.
 	// Parts that haven't been uploaded yet will have nil
 	// elements.
@@ -508,4 +498,15 @@ type UploadInfoResponse struct {
 
 	// Expires holds when the upload will expire.
 	Expires time.Time
+
+	// MinPartSize holds the minimum size of a part that may
+	// be uploaded (not including the last part).
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a part that may
+	// be uploaded.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts.
+	MaxParts int
 }
