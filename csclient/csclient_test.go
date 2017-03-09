@@ -1355,7 +1355,7 @@ func (s *suite) TestPutMultiError(c *gc.C) {
 	cause := cause0.(*params.Error)
 	// Instead, we get just the "multiple errors" code.
 	c.Assert(cause.ErrorInfo(), jc.DeepEquals, map[string]*params.Error{
-		"~charmers/utopic/xxx-42": &params.Error{
+		"~charmers/utopic/xxx-42": {
 			Message: `no matching charm or bundle for cs:~charmers/utopic/xxx-42`,
 			Code:    params.ErrNotFound,
 		},
@@ -1828,6 +1828,64 @@ func (s *suite) TestUploadTooLargeResource(c *gc.C) {
 	c.Assert(err, gc.ErrorMatches, `resource too big \(allowed \d+\.\d{3}GB\)`)
 }
 
+type errorReaderAt struct {
+	reader io.ReaderAt
+}
+
+func (e errorReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	if off > 0 {
+		return 0, errgo.New("stop here")
+	}
+	return e.reader.ReadAt(p, off)
+}
+
+func (s *suite) TestResumeUploadResource(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	content := "abcdefghijklmnopqrstuvwxyz"
+	// Upload the resource.
+	progress := &testProgress{c: c}
+	e := &errorReaderAt{
+		reader: strings.NewReader(content),
+	}
+	rev, err := s.client.UploadResource(url, "resname", "data", e, int64(len(content)), progress)
+	c.Assert(err, gc.ErrorMatches, "cannot read resource: stop here")
+	rev, err = s.client.ResumeUploadResource(progress.uploadId, url, "resname", "data", strings.NewReader(content), int64(len(content)), progress)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 0)
+
+	// Check that we can download it OK.
+	getResult, err := s.client.GetResource(url, "resname", 0)
+	c.Assert(err, jc.ErrorIsNil)
+	defer getResult.Close()
+
+	expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	c.Assert(getResult.Hash, gc.Equals, expectHash)
+
+	gotData, err := ioutil.ReadAll(getResult)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(gotData), gc.Equals, content)
+	c.Assert(progress.Collected, jc.DeepEquals, []interface{}{
+		startProgress{},
+		transferredProgress{10},
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{26},
+		finalizingProgress{},
+	})
+}
+
 func (s *suite) TestListResources(c *gc.C) {
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
@@ -2067,6 +2125,7 @@ func (m *termsChecker) CheckThirdPartyCaveat(ctx context.Context, p httpbakery.T
 type testProgress struct {
 	c         *gc.C
 	Collected []interface{}
+	uploadId  string
 }
 
 type startProgress struct {
@@ -2087,6 +2146,7 @@ func (p *testProgress) Start(uploadId string, expires time.Time) {
 	p.Collected = append(p.Collected, startProgress{})
 	p.c.Assert(uploadId, gc.NotNil)
 	p.c.Assert(expires.After(time.Now()), gc.Equals, true)
+	p.uploadId = uploadId
 }
 
 func (p *testProgress) Transferred(total int64) {
