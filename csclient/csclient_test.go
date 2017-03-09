@@ -615,7 +615,7 @@ var getArchiveWithBadResponseTests = []struct {
 		Body:          ioutil.NopCloser(strings.NewReader("")),
 		ContentLength: fakeSize,
 	},
-	expectError: `invalid entity id found in response: charm or bundle URL has invalid schema: "no:such"`,
+	expectError: `invalid entity id found in response: cannot parse URL "no:such": schema "no" not valid`,
 }, {
 	about: "partial entity id header",
 	response: &http.Response{
@@ -1100,12 +1100,12 @@ func (s *suite) TestResourceMeta(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	r1content0 := "r1 content 0"
-	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content0), int64(len(r1content0)), nil)
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content0), int64(len(r1content0)), "", nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
 	r1content1 := "r1 content 1"
-	rev, err = s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content1), int64(len(r1content1)), nil)
+	rev, err = s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content1), int64(len(r1content1)), "", nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 1)
 
@@ -1390,7 +1390,7 @@ func (s *suite) TestPutMultiError(c *gc.C) {
 	cause := cause0.(*params.Error)
 	// Instead, we get just the "multiple errors" code.
 	c.Assert(cause.ErrorInfo(), jc.DeepEquals, map[string]*params.Error{
-		"~charmers/utopic/xxx-42": &params.Error{
+		"~charmers/utopic/xxx-42": {
 			Message: `no matching charm or bundle for cs:~charmers/utopic/xxx-42`,
 			Code:    params.ErrNotFound,
 		},
@@ -1710,7 +1710,7 @@ func (s *suite) TestUploadResource(c *gc.C) {
 	for i := 0; i < 3; i++ {
 		// Upload the resource.
 		data := fmt.Sprintf("boo!%d", i)
-		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data), int64(len(data)), nil)
+		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data), int64(len(data)), "", nil)
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(rev, gc.Equals, i)
 
@@ -1745,7 +1745,7 @@ func (s *suite) TestUploadLargeResource(c *gc.C) {
 	content := "abcdefghijklmnopqrstuvwxyz"
 	// Upload the resource.
 	progress := &testProgress{c: c}
-	rev, err := s.client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), progress)
+	rev, err := s.client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), "", progress)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
@@ -1826,7 +1826,7 @@ func (s *suite) TestUploadLargeResourceProgressWhenGetting504(c *gc.C) {
 	content := "abcdefghijklmnopqrstuvwxyz"
 	// Upload the resource.
 	progress := &testProgress{c: c}
-	rev, err := client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), progress)
+	rev, err := client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), "", progress)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
@@ -1874,13 +1874,71 @@ func (s *suite) TestUploadLargeResourceWithHashMismatch(c *gc.C) {
 		content: []byte("abcdefghijklmnopqrstuvwxyz"),
 	}
 	// Upload the resource.
-	_, err = s.client.UploadResource(url, "resname", "data", r, int64(len(r.content)), nil)
+	_, err = s.client.UploadResource(url, "resname", "data", r, int64(len(r.content)), "", nil)
 	c.Assert(err, gc.ErrorMatches, `cannot upload part ".*/0": hash mismatch`)
 }
 
 func (s *suite) TestUploadTooLargeResource(c *gc.C) {
-	_, err := s.client.UploadResource(charm.MustParseURL("cs:~who/trusty/mysql"), "resname", "data", strings.NewReader(""), 1<<60, nil)
+	_, err := s.client.UploadResource(charm.MustParseURL("cs:~who/trusty/mysql"), "resname", "data", strings.NewReader(""), 1<<60, "", nil)
 	c.Assert(err, gc.ErrorMatches, `resource too big \(allowed \d+\.\d{3}GB\)`)
+}
+
+type errorReaderAt struct {
+	reader io.ReaderAt
+}
+
+func (e errorReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
+	if off > 0 {
+		return 0, errgo.New("stop here")
+	}
+	return e.reader.ReadAt(p, off)
+}
+
+func (s *suite) TestUploadResourceResume(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	content := "abcdefghijklmnopqrstuvwxyz"
+	// Upload the resource.
+	progress := &testProgress{c: c}
+	e := &errorReaderAt{
+		reader: strings.NewReader(content),
+	}
+	rev, err := s.client.UploadResource(url, "resname", "data", e, int64(len(content)), "", progress)
+	c.Assert(err, gc.ErrorMatches, "cannot read resource: stop here")
+	rev, err = s.client.UploadResource(url, "resname", "data", strings.NewReader(content), int64(len(content)), progress.uploadId, progress)
+	c.Assert(err, gc.Equals, nil)
+	c.Assert(rev, gc.Equals, 0)
+
+	// Check that we can download it OK.
+	getResult, err := s.client.GetResource(url, "resname", 0)
+	c.Assert(err, jc.ErrorIsNil)
+	defer getResult.Close()
+
+	expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+	c.Assert(getResult.Hash, gc.Equals, expectHash)
+
+	gotData, err := ioutil.ReadAll(getResult)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(gotData), gc.Equals, content)
+	c.Assert(progress.Collected, jc.DeepEquals, []interface{}{
+		startProgress{},
+		transferredProgress{10},
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{26},
+		finalizingProgress{},
+	})
 }
 
 func (s *suite) TestListResources(c *gc.C) {
@@ -1908,12 +1966,12 @@ func (s *suite) TestListResources(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 
 	r1content := "r1 content"
-	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content), int64(len(r1content)), nil)
+	rev, err := s.client.UploadResource(url, "r1", "data.zip", strings.NewReader(r1content), int64(len(r1content)), "", nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
 	r2content := "r2 content"
-	rev, err = s.client.UploadResource(url, "r2", "data", strings.NewReader(r2content), int64(len(r2content)), nil)
+	rev, err = s.client.UploadResource(url, "r2", "data", strings.NewReader(r2content), int64(len(r2content)), "", nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 0)
 
@@ -2130,6 +2188,7 @@ func (m *termsDischarger) thirdPartyChecker(_ *http.Request, cond, args string) 
 type testProgress struct {
 	c         *gc.C
 	Collected []interface{}
+	uploadId  string
 }
 
 type startProgress struct {
@@ -2150,6 +2209,7 @@ func (p *testProgress) Start(uploadId string, expires time.Time) {
 	p.Collected = append(p.Collected, startProgress{})
 	p.c.Assert(uploadId, gc.NotNil)
 	p.c.Assert(expires.After(time.Now()), gc.Equals, true)
+	p.uploadId = uploadId
 }
 
 func (p *testProgress) Transferred(total int64) {

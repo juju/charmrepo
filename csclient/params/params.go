@@ -508,4 +508,15 @@ type UploadInfoResponse struct {
 
 	// Expires holds when the upload will expire.
 	Expires time.Time
+
+	// MinPartSize holds the minimum size of a part that may
+	// be uploaded (not including the last part).
+	MinPartSize int64
+
+	// MaxPartSize holds the maximum size of a part that may
+	// be uploaded.
+	MaxPartSize int64
+
+	// MaxParts holds the maximum number of parts.
+	MaxParts int
 }
