@@ -484,12 +484,28 @@ type Parts struct {
 
 // Part represents one part of a multipart blob.
 type Part struct {
-	// Hash holds the SHA384 hash of the part (hex-encoded)
+	// Hash holds the SHA384 hash of the part.
 	Hash string
+	// Size holds the size of the part.
+	Size int64
+	// Complete holds whether the part has been
+	// successfully uploaded.
+	Complete bool
 }
 
 // FinishUploadResponse holds the response to a put /upload/upload-id/part-number request.
 type FinishUploadResponse struct {
 	// Hash holds the SHA384 hash of the complete blob. (hex-encoded)
 	Hash string
+}
+
+// UploadInfoResponse holds the response to a get /upload/upload-id request.
+type UploadInfoResponse struct {
+	// Parts holds all the known parts of the upload.
+	// Parts that haven't been uploaded yet will have nil
+	// elements.
+	Parts Parts
+
+	// Expires holds when the upload will expire.
+	Expires time.Time
 }
