@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package testing // import "gopkg.in/juju/charmrepo.v2-unstable/testing"
+package testing // import "gopkg.in/juju/charmrepo.v2/testing"
 
 import (
 	"bytes"
@@ -16,9 +16,9 @@ import (
 	"github.com/juju/loggo"
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmrepo.v2-unstable"
+	"gopkg.in/juju/charmrepo.v2"
 )
 
 var logger = loggo.GetLogger("juju.charm.testing.mockstore")

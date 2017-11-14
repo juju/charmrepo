@@ -1,4 +1,4 @@
-package migratebundle
+package migratebundle // import "gopkg.in/juju/charmrepo.v2/migratebundle"
 
 import (
 	"bufio"
@@ -15,10 +15,10 @@ import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmrepo.v2-unstable"
+	"gopkg.in/juju/charmrepo.v2"
 )
 
 var _ = gc.Suite(&migrateSuite{})

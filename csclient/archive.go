@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient // import "gopkg.in/juju/charmrepo.v2-unstable/csclient"
+package csclient // import "gopkg.in/juju/charmrepo.v2/csclient"
 
 import (
 	"crypto/sha512"
@@ -11,7 +11,7 @@ import (
 	"os"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 )
 
 // ReadSeekCloser implements io.ReadSeeker and io.Closer.

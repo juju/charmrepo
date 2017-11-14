@@ -1,4 +1,4 @@
-package testing_test
+package testing_test // import "gopkg.in/juju/charmrepo.v2/testing"
 
 import (
 	"testing"
