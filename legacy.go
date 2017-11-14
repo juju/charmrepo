@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v2-unstable"
+package charmrepo // import "gopkg.in/juju/charmrepo.v2"
 
 import (
 	"encoding/json"
@@ -17,7 +17,7 @@ import (
 	"strings"
 
 	"github.com/juju/utils"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 )
 
 // LegacyCharmStore is a repository Interface that provides access to the

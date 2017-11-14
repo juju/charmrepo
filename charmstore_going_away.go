@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v2-unstable"
+package charmrepo // import "gopkg.in/juju/charmrepo.v2"
 
 // This file may go away once Juju stops using anything here.
 
@@ -9,10 +9,10 @@ import (
 	"net/http"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
+	"gopkg.in/juju/charmrepo.v2/csclient"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
 )
 
 // URL returns the root endpoint URL of the charm store.

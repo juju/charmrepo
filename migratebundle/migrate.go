@@ -1,11 +1,11 @@
-package migratebundle
+package migratebundle // import "gopkg.in/juju/charmrepo.v2/migratebundle"
 
 import (
 	"fmt"
 	"strings"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
+	"gopkg.in/juju/charm.v6"
 	"gopkg.in/yaml.v2"
 )
 

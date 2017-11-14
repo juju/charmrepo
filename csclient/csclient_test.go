@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient_test
+package csclient_test // import "gopkg.in/juju/charmrepo.v2/csclient"
 
 import (
 	"bytes"
@@ -27,9 +27,9 @@ import (
 	"github.com/juju/utils"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6-unstable"
-	"gopkg.in/juju/charm.v6-unstable/resource"
-	"gopkg.in/juju/charmstore.v5-unstable"
+	"gopkg.in/juju/charm.v6"
+	"gopkg.in/juju/charm.v6/resource"
+	"gopkg.in/juju/charmstore.v5"
 	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
 	"gopkg.in/macaroon-bakery.v1/bakerytest"
 	"gopkg.in/macaroon-bakery.v1/httpbakery"
@@ -37,9 +37,9 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient"
-	"gopkg.in/juju/charmrepo.v2-unstable/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v2-unstable/testing"
+	"gopkg.in/juju/charmrepo.v2/csclient"
+	"gopkg.in/juju/charmrepo.v2/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
@@ -615,7 +615,7 @@ var getArchiveWithBadResponseTests = []struct {
 		Body:          ioutil.NopCloser(strings.NewReader("")),
 		ContentLength: fakeSize,
 	},
-	expectError: `invalid entity id found in response: charm or bundle URL has invalid schema: "no:such"`,
+	expectError: `invalid entity id found in response: cannot parse URL "no:such": schema "no" not valid`,
 }, {
 	about: "partial entity id header",
 	response: &http.Response{
@@ -761,7 +761,7 @@ func (s *suite) TestUploadArchiveWithServerError(c *gc.C) {
 
 	// Send an invalid hash so that the server returns an error.
 	url := charm.MustParseURL("~charmers/trusty/wordpress")
-	id, err := csclient.UploadArchive(s.client, url, body, hash+"mismatch", size, -1)
+	id, err := csclient.UploadArchive(s.client, url, body, strings.Repeat("0", len(hash)), size, -1)
 	c.Assert(id, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, "cannot post archive: cannot put archive blob: hash mismatch")
 }
@@ -1875,7 +1875,7 @@ func (s *suite) TestUploadLargeResourceWithHashMismatch(c *gc.C) {
 	}
 	// Upload the resource.
 	_, err = s.client.UploadResource(url, "resname", "data", r, int64(len(r.content)), nil)
-	c.Assert(err, gc.ErrorMatches, `cannot upload part ".*/0": hash mismatch`)
+	c.Assert(err, gc.ErrorMatches, `cannot upload part ".*": hash mismatch`)
 }
 
 func (s *suite) TestUploadTooLargeResource(c *gc.C) {
