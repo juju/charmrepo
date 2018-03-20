@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "gopkg.in/juju/charmrepo.v2"
+package charmrepo_test // import "gopkg.in/juju/charmrepo.v3"
 
 import (
 	"fmt"
@@ -14,8 +14,8 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmrepo.v2"
-	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
+	"gopkg.in/juju/charmrepo.v3"
+	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
 )
 
 type legacyCharmStoreSuite struct {

@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "gopkg.in/juju/charmrepo.v2"
+package charmrepo_test // import "gopkg.in/juju/charmrepo.v3"
 
 import (
 	"crypto/sha256"
@@ -23,10 +23,10 @@ import (
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmstore.v5"
 
-	"gopkg.in/juju/charmrepo.v2"
-	"gopkg.in/juju/charmrepo.v2/csclient"
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
+	"gopkg.in/juju/charmrepo.v3"
+	"gopkg.in/juju/charmrepo.v3/csclient"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
 )
 
 type charmStoreSuite struct {
@@ -589,7 +589,7 @@ var sortChannelsTests = []struct {
 	input:  []params.Channel{params.UnpublishedChannel},
 	sorted: []params.Channel{params.UnpublishedChannel},
 }, {
-// No channels provided.
+	// No channels provided.
 }}
 
 func (s *charmStoreRepoSuite) TestSortChannels(c *gc.C) {

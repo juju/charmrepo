@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient_test // import "gopkg.in/juju/charmrepo.v2/csclient"
+package csclient_test // import "gopkg.in/juju/charmrepo.v3/csclient"
 
 import (
 	"bytes"
@@ -37,9 +37,9 @@ import (
 	"gopkg.in/macaroon.v1"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v2/csclient"
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v2/testing"
+	"gopkg.in/juju/charmrepo.v3/csclient"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
