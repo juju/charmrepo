@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v2"
+package charmrepo // import "gopkg.in/juju/charmrepo.v3"
 
 import (
 	"encoding/json"
