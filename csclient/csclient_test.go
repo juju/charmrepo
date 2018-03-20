@@ -30,11 +30,10 @@ import (
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmstore.v5"
-	"gopkg.in/macaroon-bakery.v1/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v1/bakerytest"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
-	httpbakery2 "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon.v2-unstable"
 	"gopkg.in/mgo.v2"
 
 	"gopkg.in/juju/charmrepo.v3/csclient"
@@ -96,7 +95,7 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 		AuthUsername:      "test-user",
 		AuthPassword:      "test-password",
 		IdentityLocation:  discharger.Service.Location(),
-		PublicKeyLocator:  httpbakery2.NewPublicKeyRing(httpbakery2.NewHTTPClient(), nil),
+		PublicKeyLocator:  httpbakery.NewPublicKeyRing(httpbakery.NewHTTPClient(), nil),
 		TermsLocation:     termsDischarger.Service.Location(),
 		MinUploadPartSize: 10,
 	}
@@ -115,9 +114,9 @@ func (s *suite) TestNewWithBakeryClient(c *gc.C) {
 	// enables us to tell if that's really being used.
 	bclient := httpbakery.NewClient()
 	acquired := false
-	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(cav macaroon.Caveat) (*macaroon.Macaroon, error) {
 		acquired = true
-		return bclient.AcquireDischarge(firstPartyLocation, cav)
+		return bclient.AcquireDischarge(cav)
 	})
 	client := csclient.New(csclient.Params{
 		URL:          s.srv.URL,
@@ -2096,10 +2095,10 @@ func hashOfPath(c *gc.C, path string) string {
 	return fmt.Sprintf("%x", hash.Sum(nil))
 }
 
-type dischargeAcquirerFunc func(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error)
+type dischargeAcquirerFunc func(cav macaroon.Caveat) (*macaroon.Macaroon, error)
 
-func (f dischargeAcquirerFunc) AcquireDischarge(firstPartyLocation string, cav macaroon.Caveat) (*macaroon.Macaroon, error) {
-	return f(firstPartyLocation, cav)
+func (f dischargeAcquirerFunc) AcquireDischarge(cav macaroon.Caveat) (*macaroon.Macaroon, error) {
+	return f(cav)
 }
 
 // mockTermsService mocks out the functionality of the terms service for testing

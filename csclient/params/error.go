@@ -8,7 +8,7 @@ import (
 	"strings"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v1/httpbakery"
+	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
 )
 
 // ErrorCode holds the class of an error in machine-readable format.

@@ -12,7 +12,7 @@ import (
 
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/macaroon.v1"
+	"gopkg.in/macaroon.v2-unstable"
 )
 
 const (
