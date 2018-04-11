@@ -1,7 +1,7 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params_test // import "gopkg.in/juju/charmrepo.v2/csclient/params"
+package params_test // import "gopkg.in/juju/charmrepo.v3/csclient/params"
 
 import (
 	"github.com/juju/testing"
@@ -9,7 +9,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6/resource"
 
-	"gopkg.in/juju/charmrepo.v2/csclient/params"
+	"gopkg.in/juju/charmrepo.v3/csclient/params"
 )
 
 const fingerprint = "123456789012345678901234567890123456789012345678"
