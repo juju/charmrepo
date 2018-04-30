@@ -10,7 +10,7 @@
 // denied, an error with a cause satisfying IsAuthorizationError will be
 // returned. Note that these errors can also include errors returned by
 // httpbakery when it attempts to discharge macaroons.
-package csclient // import "gopkg.in/juju/charmrepo.v3/csclient"
+package csclient // import "gopkg.in/juju/charmrepo.v4/csclient"
 
 import (
 	"bytes"
@@ -30,10 +30,9 @@ import (
 
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	"gopkg.in/juju/charmrepo.v4/csclient/params"
 )
 
 const apiVersion = "v5"
@@ -76,25 +75,10 @@ type Params struct {
 	// requests to the store. This is used in preference to
 	// HTTPClient.
 	BakeryClient *httpbakery.Client
-
-	// HTTPClient holds the HTTP client to use when making
-	// requests to the store. If nil, httpbakery.NewHTTPClient will
-	// be used.
-	HTTPClient *http.Client
-
-	// VisitWebPage is called when authorization requires that
-	// the user visits a web page to authenticate themselves.
-	// If nil, no interaction will be allowed. This field
-	// is ignored if BakeryClient is provided.
-	VisitWebPage func(url *url.URL) error
-
-	// Auth holds a list of macaroons that will be added to the cookie jar of
-	// the HTTP Client that is used by this client.
-	Auth macaroon.Slice
 }
 
 type httpClient interface {
-	DoWithBody(*http.Request, io.ReadSeeker) (*http.Response, error)
+	Do(*http.Request) (*http.Response, error)
 }
 
 // New returns a new charm store client.
@@ -104,22 +88,8 @@ func New(p Params) *Client {
 	}
 	bclient := p.BakeryClient
 	if bclient == nil {
-		if p.HTTPClient == nil {
-			p.HTTPClient = httpbakery.NewHTTPClient()
-		}
-		bclient = &httpbakery.Client{
-			Client:       p.HTTPClient,
-			VisitWebPage: p.VisitWebPage,
-		}
-	}
-	if len(p.Auth) > 0 {
-		url, err := url.Parse(p.URL)
-		// A non-nil error here will get caught at request time when we try
-		// to parse the URL, and without a valid URL, the macaroons don't matter
-		// anyway.
-		if err == nil {
-			httpbakery.SetCookie(bclient.Jar, url, p.Auth)
-		}
+		bclient = httpbakery.NewClient()
+		bclient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
 	return &Client{
 		bclient: bclient,
@@ -282,21 +252,14 @@ func (c *Client) uploadSinglePartResource(id *charm.URL, name, path string, file
 		return 0, errgo.Newf("resource file changed underfoot? (initial size %d, then %d)", size, size1)
 	}
 	// Prepare the request.
-	req, err := http.NewRequest("POST", "", nil)
+	req, err := http.NewRequest("POST", "", newProgressReader(io.NewSectionReader(file, 0, size), progress, 0))
 	if err != nil {
 		return 0, errgo.Notef(err, "cannot make new request")
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = size
-
-	hash = url.QueryEscape(hash)
-	path = url.QueryEscape(path)
-
-	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", id.Path(), name, hash, path)
-
-	r := newProgressReader(io.NewSectionReader(file, 0, size), progress, 0)
-	// Send the request.
-	resp, err := c.DoWithBody(req, url, r)
+	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", id.Path(), name, url.QueryEscape(hash), url.QueryEscape(path))
+	resp, err := c.Do(req, url)
 	if err != nil {
 		return 0, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
@@ -418,13 +381,13 @@ func (c *Client) uploadPart(uploadId string, part int, r io.ReaderAt, p0, p1 int
 	var lastError error
 	section := newProgressReader(io.NewSectionReader(r, p0, p1-p0), progress, p0)
 	for i := 0; i < 10; i++ {
-		req, err := http.NewRequest("PUT", "", nil)
+		req, err := http.NewRequest("PUT", "", section)
 		if err != nil {
 			return "", errgo.Mask(err)
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.ContentLength = p1 - p0
-		resp, err := c.DoWithBody(req, fmt.Sprintf("/upload/%s/%d?hash=%s", uploadId, part, hash), section)
+		resp, err := c.Do(req, fmt.Sprintf("/upload/%s/%d?hash=%s", uploadId, part, hash))
 		if err == nil {
 			// Success
 			resp.Body.Close()
@@ -639,7 +602,7 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 	}
 
 	// Prepare the request.
-	req, err := http.NewRequest(method, "", nil)
+	req, err := http.NewRequest(method, "", body)
 	if err != nil {
 		return nil, errgo.Notef(err, "cannot make new request")
 	}
@@ -647,10 +610,9 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 	req.ContentLength = size
 
 	// Send the request.
-	resp, err := c.DoWithBody(
+	resp, err := c.Do(
 		req,
 		"/"+id.Path()+"/archive?hash="+hash+promulgatedArg,
-		body,
 	)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot post archive", isAPIError)
@@ -848,14 +810,13 @@ func (c *Client) PutWithResponse(path string, val, result interface{}) error {
 }
 
 func (c *Client) doWithResponse(method string, path string, val, result interface{}) error {
-	req, _ := http.NewRequest(method, "", nil)
-	req.Header.Set("Content-Type", "application/json")
 	data, err := json.Marshal(val)
 	if err != nil {
 		return errgo.Notef(err, "cannot marshal PUT body")
 	}
-	body := bytes.NewReader(data)
-	resp, err := c.DoWithBody(req, path, body)
+	req, _ := http.NewRequest(method, "", bytes.NewReader(data))
+	req.Header.Set("Content-Type", "application/json")
+	resp, err := c.Do(req, path)
 	if err != nil {
 		return errgo.Mask(err, isAPIError)
 	}
@@ -882,12 +843,23 @@ func parseResponseBody(body io.Reader, result interface{}) error {
 	return nil
 }
 
-// DoWithBody is like Do except that the given body is used
-// as the body of the HTTP request.
+// Do makes an arbitrary request to the charm store.
+// It adds appropriate headers to the given HTTP request,
+// sends it to the charm store, and returns the resulting
+// response. Do never returns a response with a status
+// that is not http.StatusOK.
 //
-// Any error returned from the underlying httpbakery.DoWithBody
+// The URL field in the request is ignored and overwritten.
+//
+// This is a low level method - more specific Client methods
+// should be used when possible.
+//
+// Note that if a body is supplied in the request, it should
+// implement io.Seeker.
+//
+// Any error returned from the underlying httpbakery.Do
 // request will have an unchanged error cause.
-func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) (*http.Response, error) {
+func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
 	if c.params.User != "" {
 		userPass := c.params.User + ":" + c.params.Password
 		authBasic := base64.StdEncoding.EncodeToString([]byte(userPass))
@@ -913,7 +885,7 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 	req.URL = u
 
 	// Send the request.
-	resp, err := c.bclient.DoWithBody(req, body)
+	resp, err := c.bclient.Do(req)
 	if err != nil {
 		return nil, errgo.Mask(err, isAPIError)
 	}
@@ -940,26 +912,6 @@ func (c *Client) DoWithBody(req *http.Request, path string, body io.ReadSeeker) 
 		return nil, errgo.Newf("error response with empty message %s", sizeLimit(data))
 	}
 	return nil, &perr
-}
-
-// Do makes an arbitrary request to the charm store.
-// It adds appropriate headers to the given HTTP request,
-// sends it to the charm store, and returns the resulting
-// response. Do never returns a response with a status
-// that is not http.StatusOK.
-//
-// The URL field in the request is ignored and overwritten.
-//
-// This is a low level method - more specific Client methods
-// should be used when possible.
-//
-// For requests with a body (for example PUT or POST) use DoWithBody
-// instead.
-func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
-	if req.Body != nil {
-		return nil, errgo.New("body unexpectedly provided in http request - use DoWithBody")
-	}
-	return c.DoWithBody(req, path, nil)
 }
 
 func sizeLimit(data []byte) []byte {
@@ -991,12 +943,12 @@ func (cs *Client) Log(typ params.LogType, level params.LogLevel, message string,
 		return errgo.Notef(err, "cannot marshal log message")
 	}
 
-	req, err := http.NewRequest("POST", "", nil)
+	req, err := http.NewRequest("POST", "", bytes.NewReader(b))
 	if err != nil {
 		return errgo.Notef(err, "cannot create log request")
 	}
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := cs.DoWithBody(req, "/log", bytes.NewReader(b))
+	resp, err := cs.Do(req, "/log")
 	if err != nil {
 		return errgo.NoteMask(err, "cannot send log message", isAPIError)
 	}

@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "gopkg.in/juju/charmrepo.v3"
+package charmrepo_test // import "gopkg.in/juju/charmrepo.v4"
 
 import (
 	"crypto/sha256"
@@ -23,10 +23,10 @@ import (
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charmstore.v5"
 
-	"gopkg.in/juju/charmrepo.v3"
-	"gopkg.in/juju/charmrepo.v3/csclient"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
+	"gopkg.in/juju/charmrepo.v4"
+	"gopkg.in/juju/charmrepo.v4/csclient"
+	"gopkg.in/juju/charmrepo.v4/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v4/testing"
 )
 
 type charmStoreSuite struct {

@@ -1,4 +1,4 @@
-package migratebundle // import "gopkg.in/juju/charmrepo.v3/migratebundle"
+package migratebundle // import "gopkg.in/juju/charmrepo.v4/migratebundle"
 
 import (
 	"bufio"
@@ -18,7 +18,7 @@ import (
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/yaml.v2"
 
-	"gopkg.in/juju/charmrepo.v3"
+	"gopkg.in/juju/charmrepo.v4"
 )
 
 var _ = gc.Suite(&migrateSuite{})

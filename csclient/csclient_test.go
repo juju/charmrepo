@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient_test // import "gopkg.in/juju/charmrepo.v3/csclient"
+package csclient_test // import "gopkg.in/juju/charmrepo.v4/csclient"
 
 import (
 	"bytes"
@@ -25,20 +25,23 @@ import (
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
+	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmstore.v5"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2-unstable/bakerytest"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/juju/idmclient.v1/idmtest"
+	httpbakery2u "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
+	"gopkg.in/macaroon-bakery.v2/bakerytest"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/macaroon.v2"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v3/csclient"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
+	"gopkg.in/juju/charmrepo.v4/csclient"
+	"gopkg.in/juju/charmrepo.v4/csclient/params"
+	charmtesting "gopkg.in/juju/charmrepo.v4/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")
@@ -53,12 +56,15 @@ var fakeContent, fakeHash, fakeSize = func() (string, string, int64) {
 
 type suite struct {
 	jujutesting.IsolatedMgoSuite
-	client          *csclient.Client
-	srv             *httptest.Server
-	handler         charmstore.HTTPCloseHandler
-	serverParams    charmstore.ServerParams
-	discharge       func(cond, arg string) ([]checkers.Caveat, error)
-	termsDischarger *termsDischarger
+	client       *csclient.Client
+	srv          *httptest.Server
+	handler      charmstore.HTTPCloseHandler
+	serverParams charmstore.ServerParams
+	identitySrv  *idmtest.Server
+	termsSrv     *bakerytest.Discharger
+	// termsChecker holds the third party caveat checker used
+	// by termsSrv.
+	termsChecker *termsChecker
 }
 
 var _ = gc.Suite(&suite{})
@@ -76,29 +82,27 @@ func (s *suite) SetUpTest(c *gc.C) {
 func (s *suite) TearDownTest(c *gc.C) {
 	s.srv.Close()
 	s.handler.Close()
+	s.identitySrv.Close()
+	s.termsSrv.Close()
 	s.IsolatedMgoSuite.TearDownTest(c)
 }
 
 func (s *suite) startServer(c *gc.C, session *mgo.Session) {
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return nil, fmt.Errorf("no discharge")
-	}
+	s.identitySrv = idmtest.NewServer()
 
-	discharger := bakerytest.NewDischarger(nil, func(_ *http.Request, cond, arg string) ([]checkers.Caveat, error) {
-		return s.discharge(cond, arg)
-	})
-
-	s.termsDischarger = &termsDischarger{}
-	termsDischarger := bakerytest.NewDischarger(nil, s.termsDischarger.thirdPartyChecker)
+	s.termsChecker = &termsChecker{}
+	s.termsSrv = bakerytest.NewDischarger(nil)
+	s.termsSrv.CheckerP = s.termsChecker
 
 	serverParams := charmstore.ServerParams{
 		AuthUsername:      "test-user",
 		AuthPassword:      "test-password",
-		IdentityLocation:  discharger.Service.Location(),
-		PublicKeyLocator:  httpbakery.NewPublicKeyRing(httpbakery.NewHTTPClient(), nil),
-		TermsLocation:     termsDischarger.Service.Location(),
+		IdentityLocation:  s.identitySrv.URL.String(),
+		TermsLocation:     s.termsSrv.Location(),
 		MinUploadPartSize: 10,
+		PublicKeyLocator:  httpbakery2u.NewPublicKeyRing(nil, nil),
 	}
+	c.Logf("identity location: %s; terms location %s", serverParams.IdentityLocation, serverParams.TermsLocation)
 
 	db := session.DB("charmstore")
 	handler, err := charmstore.NewServer(db, nil, "", serverParams, charmstore.V5)
@@ -106,61 +110,36 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 	s.handler = handler
 	s.srv = httptest.NewServer(handler)
 	s.serverParams = serverParams
-
 }
 
 func (s *suite) TestNewWithBakeryClient(c *gc.C) {
 	// Make a csclient.Client with a custom bakery client that
 	// enables us to tell if that's really being used.
+	used := false
 	bclient := httpbakery.NewClient()
-	acquired := false
-	bclient.DischargeAcquirer = dischargeAcquirerFunc(func(cav macaroon.Caveat) (*macaroon.Macaroon, error) {
-		acquired = true
-		return bclient.AcquireDischarge(cav)
+	bclient.Client = httpbakery.NewHTTPClient()
+	bclient.Client.Transport = roundTripperFunc(func(req *http.Request) (*http.Response, error) {
+		used = true
+		return http.DefaultTransport.RoundTrip(req)
 	})
 	client := csclient.New(csclient.Params{
 		URL:          s.srv.URL,
 		BakeryClient: bclient,
 	})
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
+	s.identitySrv.SetDefaultUser("bob")
 	err := client.UploadCharmWithRevision(
 		charm.MustParseURL("~bob/precise/wordpress-0"),
 		charmRepo.CharmDir("wordpress"),
 		42,
 	)
 	c.Assert(err, gc.IsNil)
-	c.Assert(acquired, gc.Equals, true)
+	c.Assert(used, gc.Equals, true)
 }
 
-func (s *suite) TestNewWithAuth(c *gc.C) {
-	// First acquire the macaroon slice that we'll use for authorization.
-	var m macaroon.Macaroon
-	err := s.client.Get("/macaroon", &m)
-	c.Assert(err, gc.IsNil)
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
-	ms, err := httpbakery.NewClient().DischargeAll(&m)
-	c.Assert(err, gc.IsNil)
+type roundTripperFunc func(*http.Request) (*http.Response, error)
 
-	client := csclient.New(csclient.Params{
-		URL:  s.srv.URL,
-		Auth: ms,
-	})
-
-	// Change the discharge function so that we refuse to discharge anything
-	// to make sure that we're actually using the creds above.
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return nil, errgo.Newf("no discharge")
-	}
-	err = client.UploadCharmWithRevision(
-		charm.MustParseURL("~bob/precise/wordpress-0"),
-		charmRepo.CharmDir("wordpress"),
-		42,
-	)
-	c.Assert(err, gc.IsNil)
+func (f roundTripperFunc) RoundTrip(req *http.Request) (*http.Response, error) {
+	return f(req)
 }
 
 func (s *suite) TestIsAuthorizationError(c *gc.C) {
@@ -179,28 +158,15 @@ func (s *suite) TestIsAuthorizationError(c *gc.C) {
 		return errgo.Mask(err, errgo.Any)
 	}
 	err := doSomething()
-	c.Assert(err, gc.ErrorMatches, `cannot log in: cannot retrieve the authentication macaroon: cannot get discharge from "https://.*": third party refused discharge: cannot discharge: no discharge`)
+	c.Assert(err, gc.ErrorMatches, `cannot log in: cannot retrieve the authentication macaroon: cannot get discharge from "https://.*": cannot start interactive session: interaction required but not possible`)
 	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError, gc.Commentf("cause type %T", errgo.Cause(err)))
 
-	// Make a request that requires an interaction, which will also be denied.
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return nil, &httpbakery.Error{
-			Code:    httpbakery.ErrInteractionRequired,
-			Message: "get out more",
-			Info: &httpbakery.ErrorInfo{
-				VisitURL: "http://0.1.2.3/",
-				WaitURL:  "http://0.1.2.3/",
-			},
-		}
-	}
-	err = doSomething()
-	c.Assert(err, gc.ErrorMatches, `cannot log in: cannot retrieve the authentication macaroon: cannot get discharge from "https://.*": cannot start interactive session: interaction required but not possible`)
-	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError)
+	// TODO it might be nice to test the case where the discharge request returns an error
+	// rather than an interaction-required error, but it's a bit awkward to do and probably
+	// not that important or error-prone a path to test, so we don't for now.
 
 	// Make a request that is denied because it's with the wrong user.
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice")}, nil
-	}
+	s.identitySrv.SetDefaultUser("alice")
 	err = doSomething()
 	c.Assert(err, gc.ErrorMatches, `cannot post archive: access denied for user "alice"`)
 	c.Assert(err, jc.Satisfies, csclient.IsAuthorizationError)
@@ -556,15 +522,13 @@ func (s *suite) TestGetArchiveTermAgreementRequired(c *gc.C) {
 	client := csclient.New(csclient.Params{
 		URL: s.srv.URL,
 	})
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "alice")}, nil
-	}
+	s.identitySrv.SetDefaultUser("alice")
 
 	_, _, _, _, err = client.GetArchive(url)
 	c.Assert(err, gc.ErrorMatches, `cannot get archive because some terms have not been agreed to. Try "juju agree term1/1 term3/1"`)
 
 	// user agrees to the following terms.
-	s.termsDischarger.agreedTerms = map[string]bool{
+	s.termsChecker.agreedTerms = map[string]bool{
 		"term1/1": true,
 		"term2/1": true,
 		"term3/1": true,
@@ -992,10 +956,10 @@ func (s *suite) TestDoAuthorization(c *gc.C) {
 
 	// Then check that when we use the correct authorization,
 	// the delete succeeds.
-	req, err = http.NewRequest("PUT", "", nil)
+	req, err = http.NewRequest("PUT", "", strings.NewReader(`"hello"`))
 	c.Assert(err, gc.IsNil)
 	req.Header.Set("Content-Type", "application/json")
-	resp, err := client.DoWithBody(req, "/~charmers/utopic/wordpress-42/meta/extra-info/foo", strings.NewReader(`"hello"`))
+	resp, err := client.Do(req, "/~charmers/utopic/wordpress-42/meta/extra-info/foo")
 	c.Assert(err, gc.IsNil)
 	resp.Body.Close()
 
@@ -1141,10 +1105,12 @@ func badResponseClient(resp *http.Response, err error) *csclient.Client {
 		resp:  resp,
 		error: err,
 	}
+	bclient := httpbakery.NewClient()
+	bclient.Client = client
 	return csclient.New(csclient.Params{
-		URL:        "http://0.1.2.3",
-		User:       "bob",
-		HTTPClient: client,
+		URL:          "http://0.1.2.3",
+		User:         "bob",
+		BakeryClient: bclient,
 	})
 }
 
@@ -1219,7 +1185,7 @@ func (s *suite) TestWithChannel(c *gc.C) {
 	makeRequest := func(client *csclient.Client) string {
 		req, err := http.NewRequest("GET", "", nil)
 		c.Assert(err, jc.ErrorIsNil)
-		resp, err := client.DoWithBody(req, "/", nil)
+		resp, err := client.Do(req, "/")
 		c.Assert(err, jc.ErrorIsNil)
 		c.Assert(resp.StatusCode, gc.Equals, http.StatusOK)
 		b, err := ioutil.ReadAll(resp.Body)
@@ -1561,38 +1527,26 @@ func (s *suite) TestMacaroonAuthorization(c *gc.C) {
 	var result struct{ IdRevision struct{ Revision int } }
 	// TODO 2015-01-23: once supported, rewrite the test using POST requests.
 	_, err = client.Meta(purl, &result)
-	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
-	c.Assert(httpbakery.IsDischargeError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": cannot start interactive session: no supported interaction method`)
+	c.Assert(errgo.Cause(err), jc.Satisfies, httpbakery.IsInteractionError)
 
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
+	s.identitySrv.SetDefaultUser("bob")
 	_, err = client.Meta(curl, &result)
 	c.Assert(err, gc.IsNil)
 	c.Assert(result.IdRevision.Revision, gc.Equals, curl.Revision)
 
-	visitURL := "http://0.1.2.3/visitURL"
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return nil, &httpbakery.Error{
-			Code:    httpbakery.ErrInteractionRequired,
-			Message: "interaction required",
-			Info: &httpbakery.ErrorInfo{
-				VisitURL: visitURL,
-				WaitURL:  "http://0.1.2.3/waitURL",
-			}}
-	}
+	s.identitySrv.SetDefaultUser("")
 
 	client = csclient.New(csclient.Params{
 		URL: s.srv.URL,
-		VisitWebPage: func(vurl *neturl.URL) error {
-			c.Check(vurl.String(), gc.Equals, visitURL)
-			return fmt.Errorf("stopping interaction")
-		}})
+		// Note: the default client does not support any interaction methods.
+		BakeryClient: httpbakery.NewClient(),
+	})
 
 	_, err = client.Meta(purl, &result)
-	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": cannot start interactive session: stopping interaction`)
+	c.Assert(err, gc.ErrorMatches, `cannot get "/utopic/wordpress-42/meta/any\?include=id-revision": cannot get discharge from ".*": cannot start interactive session: interaction required but not possible`)
 	c.Assert(result.IdRevision.Revision, gc.Equals, curl.Revision)
-	c.Assert(httpbakery.IsInteractionError(errgo.Cause(err)), gc.Equals, true)
+	c.Assert(errgo.Cause(err), jc.Satisfies, httpbakery.IsInteractionError)
 }
 
 func (s *suite) TestLogin(c *gc.C) {
@@ -1604,10 +1558,10 @@ func (s *suite) TestLogin(c *gc.C) {
 
 	err = s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"bob"})
 	c.Assert(err, gc.IsNil)
-	httpClient := httpbakery.NewHTTPClient()
+	bclient := httpbakery.NewClient()
 	client := csclient.New(csclient.Params{
-		URL:        s.srv.URL,
-		HTTPClient: httpClient,
+		URL:          s.srv.URL,
+		BakeryClient: bclient,
 	})
 
 	var result struct{ IdRevision struct{ Revision int } }
@@ -1616,20 +1570,16 @@ func (s *suite) TestLogin(c *gc.C) {
 
 	// Try logging in when the discharger fails.
 	err = client.Login()
-	c.Assert(err, gc.ErrorMatches, `cannot retrieve the authentication macaroon: cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
+	c.Assert(err, gc.ErrorMatches, `cannot retrieve the authentication macaroon: cannot get discharge from ".*": cannot start interactive session: interaction required but not possible`)
 
 	// Allow the discharge.
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
+	s.identitySrv.SetDefaultUser("bob")
 	err = client.Login()
 	c.Assert(err, gc.IsNil)
 
-	// Change discharge so that we're sure the cookies are being
+	// Change the identity server so that we're sure the cookies are being
 	// used rather than the discharge mechanism.
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return nil, fmt.Errorf("no discharge")
-	}
+	s.identitySrv.SetDefaultUser("")
 
 	// Check that the request still works.
 	_, err = client.Meta(purl, &result)
@@ -1639,27 +1589,23 @@ func (s *suite) TestLogin(c *gc.C) {
 	// Check that we've got one cookie.
 	srvURL, err := neturl.Parse(s.srv.URL)
 	c.Assert(err, gc.IsNil)
-	c.Assert(httpClient.Jar.Cookies(srvURL), gc.HasLen, 1)
+	c.Assert(bclient.Jar.Cookies(srvURL), gc.HasLen, 1)
 
 	// Log in again.
 	err = client.Login()
 	c.Assert(err, gc.IsNil)
 
 	// Check that we still only have one cookie.
-	c.Assert(httpClient.Jar.Cookies(srvURL), gc.HasLen, 1)
+	c.Assert(bclient.Jar.Cookies(srvURL), gc.HasLen, 1)
 }
 
 func (s *suite) TestWhoAmI(c *gc.C) {
-	httpClient := httpbakery.NewHTTPClient()
 	client := csclient.New(csclient.Params{
-		URL:        s.srv.URL,
-		HTTPClient: httpClient,
+		URL: s.srv.URL,
 	})
 	response, err := client.WhoAmI()
-	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*": third party refused discharge: cannot discharge: no discharge`)
-	s.discharge = func(cond, arg string) ([]checkers.Caveat, error) {
-		return []checkers.Caveat{checkers.DeclaredCaveat("username", "bob")}, nil
-	}
+	c.Assert(err, gc.ErrorMatches, `cannot get discharge from ".*": cannot start interactive session: no supported interaction method`)
+	s.identitySrv.SetDefaultUser("bob")
 
 	response, err = client.WhoAmI()
 	c.Assert(err, gc.IsNil)
@@ -2101,13 +2047,17 @@ func (f dischargeAcquirerFunc) AcquireDischarge(cav macaroon.Caveat) (*macaroon.
 	return f(cav)
 }
 
-// mockTermsService mocks out the functionality of the terms service for testing
+// termsChecker mocks out the functionality of the terms service for testing
 // purposes.
-type termsDischarger struct {
+type termsChecker struct {
 	agreedTerms map[string]bool
 }
 
-func (m *termsDischarger) thirdPartyChecker(_ *http.Request, cond, args string) ([]checkers.Caveat, error) {
+func (m *termsChecker) CheckThirdPartyCaveat(ctx context.Context, p httpbakery.ThirdPartyCaveatCheckerParams) ([]checkers.Caveat, error) {
+	cond, args, err := checkers.ParseCaveat(string(p.Caveat.Condition))
+	if err != nil {
+		return nil, errgo.Mask(err)
+	}
 	terms := strings.Fields(args)
 
 	if cond != "has-agreed" {
