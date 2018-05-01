@@ -1,14 +1,14 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params // import "gopkg.in/juju/charmrepo.v3/csclient/params"
+package params // import "gopkg.in/juju/charmrepo.v4/csclient/params"
 
 import (
 	"fmt"
 	"strings"
 
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 )
 
 // ErrorCode holds the class of an error in machine-readable format.

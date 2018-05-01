@@ -1,4 +1,4 @@
-package migratebundle // import "gopkg.in/juju/charmrepo.v3/migratebundle"
+package migratebundle // import "gopkg.in/juju/charmrepo.v4/migratebundle"
 
 import (
 	"testing"

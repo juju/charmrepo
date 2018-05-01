@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package testing // import "gopkg.in/juju/charmrepo.v3/testing"
+package testing // import "gopkg.in/juju/charmrepo.v4/testing"
 
 import (
 	"archive/zip"

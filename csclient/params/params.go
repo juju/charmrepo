@@ -4,7 +4,7 @@
 // The params package holds types that are a part of the charm store's external
 // contract - they will be marshalled (or unmarshalled) as JSON
 // and delivered through the HTTP API.
-package params // import "gopkg.in/juju/charmrepo.v3/csclient/params"
+package params // import "gopkg.in/juju/charmrepo.v4/csclient/params"
 
 import (
 	"encoding/json"
@@ -12,7 +12,7 @@ import (
 
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/macaroon.v2-unstable"
+	"gopkg.in/macaroon.v2"
 )
 
 const (

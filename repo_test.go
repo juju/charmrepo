@@ -1,16 +1,16 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "gopkg.in/juju/charmrepo.v3"
+package charmrepo_test // import "gopkg.in/juju/charmrepo.v4"
 
 import (
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/juju/charm.v6"
 
-	"gopkg.in/juju/charmrepo.v3"
-	"gopkg.in/juju/charmrepo.v3/csclient"
-	charmtesting "gopkg.in/juju/charmrepo.v3/testing"
+	"gopkg.in/juju/charmrepo.v4"
+	"gopkg.in/juju/charmrepo.v4/csclient"
+	charmtesting "gopkg.in/juju/charmrepo.v4/testing"
 )
 
 var TestCharms = charmtesting.NewRepo("internal/test-charm-repo", "quantal")

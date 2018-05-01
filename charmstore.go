@@ -1,15 +1,13 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v3"
+package charmrepo // import "gopkg.in/juju/charmrepo.v4"
 
 import (
 	"crypto/sha512"
 	"fmt"
 	"io"
 	"io/ioutil"
-	"net/http"
-	"net/url"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,10 +15,10 @@ import (
 	"github.com/juju/utils"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/juju/charm.v6"
-	"gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
+	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v3/csclient"
-	"gopkg.in/juju/charmrepo.v3/csclient/params"
+	"gopkg.in/juju/charmrepo.v4/csclient"
+	"gopkg.in/juju/charmrepo.v4/csclient/params"
 )
 
 // CacheDir stores the charm cache directory path.
@@ -47,17 +45,6 @@ type NewCharmStoreParams struct {
 	// HTTPClient.
 	BakeryClient *httpbakery.Client
 
-	// HTTPClient holds the HTTP client to use when making
-	// requests to the store. If nil, httpbakery.NewHTTPClient will
-	// be used.
-	HTTPClient *http.Client
-
-	// VisitWebPage is called when authorization requires that
-	// the user visits a web page to authenticate themselves.
-	// If nil, no interaction will be allowed. This field
-	// is ignored if BakeryClient is provided.
-	VisitWebPage func(url *url.URL) error
-
 	// User holds the name to authenticate as for the client. If User is empty,
 	// no credentials will be sent.
 	User string
@@ -77,8 +64,6 @@ func NewCharmStore(p NewCharmStoreParams) *CharmStore {
 	client := csclient.New(csclient.Params{
 		URL:          p.URL,
 		BakeryClient: p.BakeryClient,
-		HTTPClient:   p.HTTPClient,
-		VisitWebPage: p.VisitWebPage,
 		User:         p.User,
 		Password:     p.Password,
 	})
