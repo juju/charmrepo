@@ -233,11 +233,17 @@ type Progress interface {
 // given file, which must have the given size. If progress is not nil, it will
 // be called to inform the caller of the progress of the upload.
 func (c *Client) UploadResource(id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
+	return c.ResumeUploadResource("", id, name, path, file, size, progress)
+}
+
+// ResumeUploadResource is like UploadResource except that if uploadId is non-empty,
+// it specifies the id of an existing upload to resume.
+func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
 	if progress == nil {
 		progress = noProgress{}
 	}
 	if size >= minMultipartUploadSize {
-		return c.uploadMultipartResource(id, name, path, file, size, progress)
+		return c.uploadMultipartResource(id, name, path, file, size, uploadId, progress)
 	}
 	return c.uploadSinglePartResource(id, name, path, file, size, progress)
 }
@@ -273,32 +279,69 @@ func (c *Client) uploadSinglePartResource(id *charm.URL, name, path string, file
 	return result.Revision, nil
 }
 
-func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
-	// Create the upload.
-	var resp params.NewUploadResponse
-	if err := c.doWithResponse("POST", "/upload", nil, &resp); err != nil {
-		if errgo.Cause(err) == params.ErrNotFound {
-			// An earlier version of the API - try single part upload even though it's big.
-			return c.uploadSinglePartResource(id, name, path, file, size, progress)
+func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file io.ReaderAt, size int64, uploadId string, progress Progress) (int, error) {
+	var expires time.Time
+	var maxParts int
+	var maxPartSize, minPartSize int64
+	var uploadedParts *[]params.Part
+	if len(uploadId) == 0 {
+		// Create the upload.
+		var resp params.NewUploadResponse
+		if err := c.doWithResponse("POST", "/upload", nil, &resp); err != nil {
+			if errgo.Cause(err) == params.ErrNotFound {
+				// An earlier version of the API - try single part upload even though it's big.
+				return c.uploadSinglePartResource(id, name, path, file, size, progress)
+			}
+			return 0, errgo.Mask(err)
 		}
-		return 0, errgo.Mask(err)
+		uploadId = resp.UploadId
+		expires = resp.Expires
+		maxParts = resp.MaxParts
+		minPartSize = resp.MinPartSize
+		maxPartSize = resp.MaxPartSize
+	} else {
+		var resp params.UploadInfoResponse
+		if err := c.doWithResponse("GET", "/upload/"+uploadId, nil, &resp); err != nil {
+			if err != nil {
+				return 0, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+			}
+			return 0, errgo.Mask(err)
+		}
+		expires = resp.Expires
+		maxParts = resp.MaxParts
+		minPartSize = resp.MinPartSize
+		maxPartSize = resp.MaxPartSize
+		uploadedParts = &resp.Parts.Parts
 	}
-	uploadId := resp.UploadId
-	progress.Start(uploadId, resp.Expires)
+	progress.Start(uploadId, expires)
 	// Calculate the part size, but round up so that we have
 	// enough parts to cover the remainder at the end.
-	partSize := (size + int64(resp.MaxParts) - 1) / int64(resp.MaxParts)
-	if partSize > resp.MaxPartSize {
-		return 0, errgo.Newf("resource too big (allowed %.3fGB)", float64(resp.MaxPartSize)*float64(resp.MaxParts)/1e9)
+	partSize := (size + int64(maxParts) - 1) / int64(maxParts)
+	if partSize > maxPartSize {
+		return 0, errgo.Newf("resource too big (allowed %.3fGB)", float64(maxPartSize)*float64(maxParts)/1e9)
 	}
-	if partSize < resp.MinPartSize {
-		partSize = resp.MinPartSize
+	if partSize < minPartSize {
+		partSize = minPartSize
 	}
+	revision, err := c.uploadParts(id, name, path, uploadId, partSize, uploadedParts, file, size, progress)
+	if err != nil {
+		return 0, errgo.Mask(err)
+	}
+	return revision, nil
+}
+
+func (c *Client) uploadParts(id *charm.URL, name, path string, uploadId string, partSize int64, uploadedParts *[]params.Part, file io.ReaderAt, size int64, progress Progress) (int, error) {
 	var parts params.Parts
+	if uploadedParts != nil {
+		parts.Parts = *uploadedParts
+	}
 	for i, p0 := 0, int64(0); ; i, p0 = i+1, p0+partSize {
 		p1 := p0 + partSize
 		if p1 > size {
 			p1 = size
+		}
+		if len(parts.Parts) > i && parts.Parts[i].Complete {
+			continue
 		}
 		// TODO concurrent part upload?
 		hash, err := c.uploadPart(uploadId, i, file, p0, p1, progress)
@@ -306,7 +349,8 @@ func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file 
 			return 0, errgo.Mask(err)
 		}
 		parts.Parts = append(parts.Parts, params.Part{
-			Hash: hash,
+			Hash:     hash,
+			Complete: true,
 		})
 		if p1 >= size {
 			break
