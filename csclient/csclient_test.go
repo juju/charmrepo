@@ -1923,22 +1923,17 @@ func (s *suite) TestLatest(c *gc.C) {
 	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Calculate and store the expected hashes for the uploaded charms.
-	mysqlHash := hashOfCharm(c, "mysql")
-	wordpressHash := hashOfCharm(c, "wordpress")
-	riakHash := hashOfCharm(c, "riak")
-
 	// Define the tests to be run.
 	tests := []struct {
 		about string
 		urls  []*charm.URL
-		revs  []params.CharmRevision
+		revs  []csclient.CharmRevision
 	}{{
 		about: "no urls",
 	}, {
 		about: "charm not found",
 		urls:  []*charm.URL{charm.MustParseURL("cs:trusty/no-such-42")},
-		revs: []params.CharmRevision{{
+		revs: []csclient.CharmRevision{{
 			Err: params.ErrNotFound,
 		}},
 	}, {
@@ -1948,15 +1943,12 @@ func (s *suite) TestLatest(c *gc.C) {
 			charm.MustParseURL("cs:~who/trusty/mysql-0"),
 			charm.MustParseURL("cs:~who/trusty/mysql"),
 		},
-		revs: []params.CharmRevision{{
+		revs: []csclient.CharmRevision{{
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}},
 	}, {
 		about: "multiple charms",
@@ -1966,17 +1958,14 @@ func (s *suite) TestLatest(c *gc.C) {
 			charm.MustParseURL("cs:~dalek/trusty/no-such"),
 			charm.MustParseURL("cs:~dalek/trusty/riak-0"),
 		},
-		revs: []params.CharmRevision{{
+		revs: []csclient.CharmRevision{{
 			Revision: 1,
-			Sha256:   wordpressHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Err: params.ErrNotFound,
 		}, {
 			Revision: 3,
-			Sha256:   riakHash,
 		}},
 	}, {
 		about: "unauthorized",
@@ -1984,9 +1973,8 @@ func (s *suite) TestLatest(c *gc.C) {
 			charm.MustParseURL("cs:~who/precise/wordpress"),
 			url,
 		},
-		revs: []params.CharmRevision{{
+		revs: []csclient.CharmRevision{{
 			Revision: 1,
-			Sha256:   wordpressHash,
 		}, {
 			Err: params.ErrNotFound,
 		}},

@@ -977,9 +977,16 @@ func (cs *Client) WhoAmI() (*params.WhoAmIResponse, error) {
 	return &response, nil
 }
 
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Err      error
+}
+
 // Latest returns the most current revision for each of the identified
 // charms. The revision in the provided charm URLs is ignored.
-func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
+func (cs *Client) Latest(curls []*charm.URL) ([]CharmRevision, error) {
 	if len(curls) == 0 {
 		return nil, nil
 	}
@@ -991,7 +998,6 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 	// an error for the whole request.
 	values.Add("ignore-auth", "1")
 	values.Add("include", "id-revision")
-	values.Add("include", "hash256")
 	for i, curl := range curls {
 		url := curl.WithRevision(-1).String()
 		urls[i] = url
@@ -1006,7 +1012,6 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 	var results map[string]struct {
 		Meta struct {
 			IdRevision params.IdRevisionResponse `json:"id-revision"`
-			Hash256    params.HashResponse       `json:"hash256"`
 		}
 	}
 	if err := cs.Get(u.String(), &results); err != nil {
@@ -1014,18 +1019,17 @@ func (cs *Client) Latest(curls []*charm.URL) ([]params.CharmRevision, error) {
 	}
 
 	// Build the response.
-	responses := make([]params.CharmRevision, len(curls))
+	responses := make([]CharmRevision, len(curls))
 	for i, url := range urls {
 		result, found := results[url]
 		if !found {
-			responses[i] = params.CharmRevision{
+			responses[i] = CharmRevision{
 				Err: params.ErrNotFound,
 			}
 			continue
 		}
-		responses[i] = params.CharmRevision{
+		responses[i] = CharmRevision{
 			Revision: result.Meta.IdRevision.Revision,
-			Sha256:   result.Meta.Hash256.Sum,
 		}
 	}
 	return responses, nil

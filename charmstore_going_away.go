@@ -15,6 +15,13 @@ import (
 	"gopkg.in/juju/charmrepo.v4/csclient/params"
 )
 
+// CharmRevision holds the revision number of a charm and any error
+// encountered in retrieving it.
+type CharmRevision struct {
+	Revision int
+	Err      error
+}
+
 // URL returns the root endpoint URL of the charm store.
 func (s *CharmStore) URL() string {
 	return s.client.ServerURL()
@@ -32,7 +39,6 @@ func (s *CharmStore) Latest(curls ...*charm.URL) ([]CharmRevision, error) {
 	for i, result := range results {
 		response := CharmRevision{
 			Revision: result.Revision,
-			Sha256:   result.Sha256,
 			Err:      result.Err,
 		}
 		if errgo.Cause(result.Err) == params.ErrNotFound {

@@ -7,7 +7,6 @@ import (
 	"crypto/sha256"
 	"fmt"
 	"io"
-	"io/ioutil"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -33,6 +32,8 @@ type charmStoreSuite struct {
 	jujutesting.IsolationSuite
 }
 
+var TestCharms = charmtesting.NewRepo("internal/test-charm-repo", "quantal")
+
 var _ = gc.Suite(&charmStoreSuite{})
 
 func (s *charmStoreSuite) TestDefaultURL(c *gc.C) {
@@ -56,7 +57,6 @@ func (s *charmStoreBaseSuite) SetUpTest(c *gc.C) {
 	s.repo = charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
 		URL: s.srv.URL,
 	})
-	s.PatchValue(&charmrepo.CacheDir, c.MkDir())
 }
 
 func (s *charmStoreBaseSuite) TearDownTest(c *gc.C) {
@@ -201,14 +201,14 @@ func (s *charmStoreRepoSuite) TestNewCharmStoreFromClient(c *gc.C) {
 
 func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
 	expect, url := s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
-	ch, err := s.repo.Get(url)
+	ch, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect)
 }
 
 func (s *charmStoreRepoSuite) TestGetPromulgated(c *gc.C) {
 	expect, url := s.addCharm(c, "trusty/mysql-42", "mysql")
-	ch, err := s.repo.Get(url)
+	ch, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect)
 }
@@ -219,70 +219,21 @@ func (s *charmStoreRepoSuite) TestGetRevisions(c *gc.C) {
 	expect2, _ := s.addCharm(c, "~dalek/trusty/riak-2", "riak")
 
 	// Retrieve an old revision.
-	ch, err := s.repo.Get(url1)
+	ch, err := s.repo.Get(url1, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect1)
 
 	// Retrieve the latest revision.
-	ch, err = s.repo.Get(charm.MustParseURL("cs:~dalek/trusty/riak"))
+	ch, err = s.repo.Get(charm.MustParseURL("cs:~dalek/trusty/riak"), filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect2)
 }
 
 func (s *charmStoreRepoSuite) TestGetCache(c *gc.C) {
 	_, url := s.addCharm(c, "~who/trusty/mysql-42", "mysql")
-	ch, err := s.repo.Get(url)
+	ch, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
-	path := ch.(*charm.CharmArchive).Path
-	c.Assert(hashOfPath(c, path), gc.Equals, hashOfCharm(c, "mysql"))
-}
-
-func (s *charmStoreRepoSuite) TestGetSameCharm(c *gc.C) {
-	_, url := s.addCharm(c, "precise/wordpress-47", "wordpress")
-	getModTime := func(path string) time.Time {
-		info, err := os.Stat(path)
-		c.Assert(err, jc.ErrorIsNil)
-		return info.ModTime()
-	}
-
-	// Retrieve a charm.
-	ch1, err := s.repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Retrieve its cache file modification time.
-	path := ch1.(*charm.CharmArchive).Path
-	modTime := getModTime(path)
-
-	// Retrieve the same charm again.
-	ch2, err := s.repo.Get(url.WithRevision(-1))
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Check this is the same charm, and its underlying cache file is the same.
-	checkCharm(c, ch2, ch1)
-	c.Assert(ch2.(*charm.CharmArchive).Path, gc.Equals, path)
-
-	// Check the same file has been reused.
-	c.Assert(modTime.Equal(getModTime(path)), jc.IsTrue)
-}
-
-func (s *charmStoreRepoSuite) TestGetInvalidCache(c *gc.C) {
-	_, url := s.addCharm(c, "~who/trusty/mysql-1", "mysql")
-
-	// Retrieve a charm.
-	ch1, err := s.repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Modify its cache file to make it invalid.
-	path := ch1.(*charm.CharmArchive).Path
-	err = ioutil.WriteFile(path, []byte("invalid"), 0644)
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Retrieve the same charm again.
-	_, err = s.repo.Get(url)
-	c.Assert(err, jc.ErrorIsNil)
-
-	// Check that the cache file have been properly rewritten.
-	c.Assert(hashOfPath(c, path), gc.Equals, hashOfCharm(c, "mysql"))
+	c.Assert(hashOfPath(c, ch.Path), gc.Equals, hashOfCharm(c, "mysql"))
 }
 
 func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
@@ -292,36 +243,24 @@ func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
 	_, url := s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
 
 	// Retrieve the charm.
-	_, err := s.repo.Get(url)
+	_, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	s.checkCharmDownloads(c, url, 1)
 
 	// Retrieve the charm again.
-	_, err = s.repo.Get(url)
+	_, err = s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	s.checkCharmDownloads(c, url, 2)
 }
 
 func (s *charmStoreRepoSuite) TestGetErrorBundle(c *gc.C) {
-	ch, err := s.repo.Get(charm.MustParseURL("cs:bundle/django"))
+	ch, err := s.repo.Get(charm.MustParseURL("cs:bundle/django"), filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, gc.ErrorMatches, `expected a charm URL, got bundle URL "cs:bundle/django"`)
 	c.Assert(ch, gc.IsNil)
 }
 
-func (s *charmStoreRepoSuite) TestGetErrorCacheDir(c *gc.C) {
-	parentDir := c.MkDir()
-	err := os.Chmod(parentDir, 0)
-	c.Assert(err, jc.ErrorIsNil)
-	defer os.Chmod(parentDir, 0755)
-	s.PatchValue(&charmrepo.CacheDir, filepath.Join(parentDir, "cache"))
-
-	ch, err := s.repo.Get(charm.MustParseURL("cs:trusty/django"))
-	c.Assert(err, gc.ErrorMatches, `cannot create the cache directory: .*: permission denied`)
-	c.Assert(ch, gc.IsNil)
-}
-
 func (s *charmStoreRepoSuite) TestGetErrorCharmNotFound(c *gc.C) {
-	ch, err := s.repo.Get(charm.MustParseURL("cs:trusty/no-such"))
+	ch, err := s.repo.Get(charm.MustParseURL("cs:trusty/no-such"), filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, gc.ErrorMatches, `cannot retrieve "cs:trusty/no-such": charm not found`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrNotFound)
 	c.Assert(ch, gc.IsNil)
@@ -340,7 +279,7 @@ func (s *charmStoreRepoSuite) TestGetErrorServer(c *gc.C) {
 	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
 		URL: srv.URL,
 	})
-	ch, err := repo.Get(charm.MustParseURL("cs:trusty/django"))
+	ch, err := repo.Get(charm.MustParseURL("cs:trusty/django"), filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, gc.ErrorMatches, `cannot retrieve charm "cs:trusty/django": cannot get archive: bad wolf`)
 	c.Assert(errgo.Cause(err), gc.Equals, params.ErrBadRequest)
 	c.Assert(ch, gc.IsNil)
@@ -363,7 +302,7 @@ func (s *charmStoreRepoSuite) TestGetErrorHashMismatch(c *gc.C) {
 	repo := charmrepo.NewCharmStore(charmrepo.NewCharmStoreParams{
 		URL: srv.URL,
 	})
-	ch, err := repo.Get(url)
+	ch, err := repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, gc.ErrorMatches, `hash mismatch; network corruption\?`)
 	c.Assert(ch, gc.IsNil)
 }
@@ -374,14 +313,14 @@ func (s *charmStoreRepoSuite) TestGetBundle(c *gc.C) {
 	s.addCharm(c, "cs:trusty/mysql-0", "mysql")
 	s.addCharm(c, "cs:trusty/wordpress-0", "wordpress")
 	expect, url := s.addBundle(c, "cs:~who/bundle/wordpress-simple-42", "wordpress-simple")
-	b, err := s.repo.GetBundle(url)
+	b, err := s.repo.GetBundle(url, filepath.Join(c.MkDir(), "bundle"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(b.Data(), jc.DeepEquals, expect.Data())
 	c.Assert(b.ReadMe(), gc.Equals, expect.ReadMe())
 }
 
 func (s *charmStoreRepoSuite) TestGetBundleErrorCharm(c *gc.C) {
-	ch, err := s.repo.GetBundle(charm.MustParseURL("cs:trusty/django"))
+	ch, err := s.repo.GetBundle(charm.MustParseURL("cs:trusty/django"), filepath.Join(c.MkDir(), "bundle"))
 	c.Assert(err, gc.ErrorMatches, `expected a bundle URL, got charm URL "cs:trusty/django"`)
 	c.Assert(ch, gc.IsNil)
 }

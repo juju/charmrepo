@@ -6,6 +6,7 @@ package charmrepo_test // import "gopkg.in/juju/charmrepo.v4"
 import (
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"sort"
 
 	jc "github.com/juju/testing/checkers"
@@ -36,11 +37,6 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 	err := s.client.Put("/"+url.Path()+"/meta/perm/read", []string{"dalek"})
 	c.Assert(err, jc.ErrorIsNil)
 
-	// Calculate and store the expected hashes for the uploaded charms.
-	mysqlHash := hashOfCharm(c, "mysql")
-	wordpressHash := hashOfCharm(c, "wordpress")
-	riakHash := hashOfCharm(c, "riak")
-
 	// Define the tests to be run.
 	tests := []struct {
 		about string
@@ -63,13 +59,10 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 		},
 		revs: []charmrepo.CharmRevision{{
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}},
 	}, {
 		about: "multiple charms",
@@ -81,15 +74,12 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 		},
 		revs: []charmrepo.CharmRevision{{
 			Revision: 1,
-			Sha256:   wordpressHash,
 		}, {
 			Revision: 0,
-			Sha256:   mysqlHash,
 		}, {
 			Err: charmrepo.CharmNotFound("cs:~dalek/trusty/no-such"),
 		}, {
 			Revision: 3,
-			Sha256:   riakHash,
 		}},
 	}, {
 		about: "unauthorized",
@@ -99,7 +89,6 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 		},
 		revs: []charmrepo.CharmRevision{{
 			Revision: 1,
-			Sha256:   wordpressHash,
 		}, {
 			Err: charmrepo.CharmNotFound("cs:~who/utopic/varnish"),
 		}},
@@ -120,9 +109,9 @@ func (s *charmStoreRepoSuite) TestGetWithTestMode(c *gc.C) {
 	// Use a repo with test mode enabled to download a charm a couple of
 	// times, and check the downloads count is not increased.
 	repo := s.repo.WithTestMode()
-	_, err := repo.Get(url)
+	_, err := repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
-	_, err = repo.Get(url)
+	_, err = repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	s.checkCharmDownloads(c, url, 0)
 }
@@ -143,7 +132,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 	})
 
 	// Make a first request without Juju attrs.
-	_, err := repo.Get(url)
+	_, err := repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
 
@@ -152,7 +141,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 		"k1": "v1",
 		"k2": "v2",
 	})
-	_, err = repo.Get(url)
+	_, err = repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	values := header[http.CanonicalHeaderKey(charmrepo.JujuMetadataHTTPHeader)]
 	sort.Strings(values)
@@ -160,7 +149,7 @@ func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
 
 	// Make a third request after restoring empty attrs.
 	repo = repo.WithJujuAttrs(nil)
-	_, err = repo.Get(url)
+	_, err = repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(header.Get(charmrepo.JujuMetadataHTTPHeader), gc.Equals, "")
 }
