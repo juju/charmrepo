@@ -459,17 +459,24 @@ type Parts struct {
 }
 
 // Part represents one part of a multipart blob.
+// When a set of parts is returned from an upload
+// query GET, those with zero sizes should
+// be considered non-existent.
 type Part struct {
 	// Hash holds the SHA384 hash of the part.
-	Hash string
+	Hash string `json:",omitempty"`
 	// Size holds the size of the part.
-	Size int64
+	Size int64 `json:",omitempty"`
 	// Offset holds the offset of the part from the start
 	// of the file.
-	Offset int64
+	Offset int64 `json:",omitempty"`
 	// Complete holds whether the part has been
 	// successfully uploaded.
-	Complete bool
+	Complete bool `json:",omitempty"`
+}
+
+func (p Part) Valid() bool {
+	return p.Size > 0
 }
 
 // FinishUploadResponse holds the response to a put /upload/upload-id/part-number request.
