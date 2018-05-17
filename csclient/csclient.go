@@ -236,35 +236,46 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.Reader
 	return c.ResumeUploadResource("", id, name, path, file, size, progress)
 }
 
+var ErrUploadNotFound = errgo.Newf("upload not found")
+
 // ResumeUploadResource is like UploadResource except that if uploadId is non-empty,
-// it specifies the id of an existing upload to resume.
-func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
+// it specifies the id of an existing upload to resume; if an upload with this ID is not
+// found, an error with an ErrUploadNotFound cause is returned.
+func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, resourceName, path string, content io.ReaderAt, size int64, progress Progress) (revision int, err error) {
 	if progress == nil {
 		progress = noProgress{}
 	}
-	if size >= minMultipartUploadSize {
-		return c.uploadMultipartResource(id, name, path, file, size, uploadId, progress)
+	info := &uploadInfo{
+		id:           id,
+		resourceName: resourceName,
+		path:         path,
+		size:         size,
+		progress:     progress,
+		content:      content,
 	}
-	return c.uploadSinglePartResource(id, name, path, file, size, progress)
+	if size >= minMultipartUploadSize {
+		return c.uploadMultipartResource(uploadId, info)
+	}
+	return c.uploadSinglePartResource(info)
 }
 
-func (c *Client) uploadSinglePartResource(id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
-	progress.Start("", time.Time{})
-	hash, size1, err := readerHashAndSize(io.NewSectionReader(file, 0, size))
+func (c *Client) uploadSinglePartResource(info *uploadInfo) (revision int, err error) {
+	info.progress.Start("", time.Time{})
+	hash, size1, err := readerHashAndSize(io.NewSectionReader(info.content, 0, info.size))
 	if err != nil {
 		return -1, errgo.Mask(err)
 	}
-	if size1 != size {
-		return 0, errgo.Newf("resource file changed underfoot? (initial size %d, then %d)", size, size1)
+	if size1 != info.size {
+		return 0, errgo.Newf("resource file changed underfoot? (initial size %d, then %d)", info.size, size1)
 	}
 	// Prepare the request.
-	req, err := http.NewRequest("POST", "", newProgressReader(io.NewSectionReader(file, 0, size), progress, 0))
+	req, err := http.NewRequest("POST", "", newProgressReader(io.NewSectionReader(info.content, 0, info.size), info.progress, 0))
 	if err != nil {
 		return 0, errgo.Notef(err, "cannot make new request")
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
-	req.ContentLength = size
-	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", id.Path(), name, url.QueryEscape(hash), url.QueryEscape(path))
+	req.ContentLength = info.size
+	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", info.id.Path(), info.resourceName, url.QueryEscape(hash), url.QueryEscape(info.path))
 	resp, err := c.Do(req, url)
 	if err != nil {
 		return 0, errgo.NoteMask(err, "cannot post resource", isAPIError)
@@ -279,98 +290,167 @@ func (c *Client) uploadSinglePartResource(id *charm.URL, name, path string, file
 	return result.Revision, nil
 }
 
-func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file io.ReaderAt, size int64, uploadId string, progress Progress) (int, error) {
-	var expires time.Time
-	var maxParts int
-	var maxPartSize, minPartSize int64
-	var uploadedParts *[]params.Part
-	if len(uploadId) == 0 {
+type uploadInfo struct {
+	id           *charm.URL
+	resourceName string
+	path         string
+	size         int64
+	progress     Progress
+	content      io.ReaderAt
+
+	// The following fields are only set for multipart uploads.
+	params.UploadInfoResponse
+	preferredPartSize int64
+}
+
+func (c *Client) uploadMultipartResource(uploadId string, info *uploadInfo) (int, error) {
+	if uploadId == "" {
 		// Create the upload.
-		var resp params.NewUploadResponse
-		if err := c.doWithResponse("POST", "/upload", nil, &resp); err != nil {
+		if err := c.DoWithResponse("POST", "/upload", nil, &info.UploadInfoResponse); err != nil {
 			if errgo.Cause(err) == params.ErrNotFound {
 				// An earlier version of the API - try single part upload even though it's big.
-				return c.uploadSinglePartResource(id, name, path, file, size, progress)
+				return c.uploadSinglePartResource(info)
 			}
 			return 0, errgo.Mask(err)
 		}
-		uploadId = resp.UploadId
-		expires = resp.Expires
-		maxParts = resp.MaxParts
-		minPartSize = resp.MinPartSize
-		maxPartSize = resp.MaxPartSize
 	} else {
-		var resp params.UploadInfoResponse
-		if err := c.doWithResponse("GET", "/upload/"+uploadId, nil, &resp); err != nil {
-			if err != nil {
-				return 0, errgo.Mask(err, errgo.Is(params.ErrNotFound))
+		if err := c.DoWithResponse("GET", "/upload/"+uploadId, nil, &info.UploadInfoResponse); err != nil {
+			if errgo.Cause(err) == params.ErrNotFound {
+				return 0, errgo.WithCausef(nil, ErrUploadNotFound, "")
 			}
 			return 0, errgo.Mask(err)
 		}
-		expires = resp.Expires
-		maxParts = resp.MaxParts
-		minPartSize = resp.MinPartSize
-		maxPartSize = resp.MaxPartSize
-		uploadedParts = &resp.Parts.Parts
+		if info.UploadId != uploadId {
+			return 0, errgo.Newf("unexpected upload id in response (got %q want %q)", info.UploadId, uploadId)
+		}
 	}
-	progress.Start(uploadId, expires)
+	info.progress.Start(info.UploadId, info.Expires)
 	// Calculate the part size, but round up so that we have
 	// enough parts to cover the remainder at the end.
-	partSize := (size + int64(maxParts) - 1) / int64(maxParts)
-	if partSize > maxPartSize {
-		return 0, errgo.Newf("resource too big (allowed %.3fGB)", float64(maxPartSize)*float64(maxParts)/1e9)
+	info.preferredPartSize = (info.size + int64(info.MaxParts) - 1) / int64(info.MaxParts)
+	if info.preferredPartSize > info.MaxPartSize {
+		return 0, errgo.Newf("resource too big (allowed %.3fGB)", float64(info.MaxPartSize)*float64(info.MaxParts)/1e9)
 	}
-	if partSize < minPartSize {
-		partSize = minPartSize
+	if info.preferredPartSize < info.MinPartSize {
+		info.preferredPartSize = info.MinPartSize
 	}
-	revision, err := c.uploadParts(id, name, path, uploadId, partSize, uploadedParts, file, size, progress)
+	revision, err := c.uploadParts(info)
 	if err != nil {
 		return 0, errgo.Mask(err)
 	}
 	return revision, nil
 }
 
-func (c *Client) uploadParts(id *charm.URL, name, path string, uploadId string, partSize int64, uploadedParts *[]params.Part, file io.ReaderAt, size int64, progress Progress) (int, error) {
-	var parts params.Parts
-	if uploadedParts != nil {
-		parts.Parts = *uploadedParts
-	}
-	for i, p0 := 0, int64(0); ; i, p0 = i+1, p0+partSize {
-		p1 := p0 + partSize
-		if p1 > size {
-			p1 = size
-		}
-		if len(parts.Parts) > i && parts.Parts[i].Complete {
-			continue
+func (c *Client) uploadParts(info *uploadInfo) (int, error) {
+	parts := info.Parts
+	offset := int64(0)
+loop:
+	for i := 0; offset < info.size; i++ {
+		p0, p1, err := choosePartRange(i, offset, info)
+		offset = p1
+		if err != nil {
+			switch errgo.Cause(err) {
+			case errAlreadyUploaded:
+				info.progress.Transferred(p1)
+				continue
+			case errFinished:
+				break loop
+			default:
+				return 0, errgo.Mask(err)
+			}
 		}
 		// TODO concurrent part upload?
-		hash, err := c.uploadPart(uploadId, i, file, p0, p1, progress)
+		hash, err := c.uploadPart(info.UploadId, i, info.content, p0, p1, info.progress)
 		if err != nil {
 			return 0, errgo.Mask(err)
 		}
-		parts.Parts = append(parts.Parts, params.Part{
+		part := params.Part{
 			Hash:     hash,
 			Complete: true,
-		})
-		if p1 >= size {
-			break
+		}
+		if i < len(parts.Parts) {
+			parts.Parts[i] = part
+		} else {
+			// We can just append to parts because we know that if i >= len(parts.Parts),
+			// we always call uploadPart and append to parts.Parts, because choosePartRange
+			// will never return errAlreadyUploaded for a nonexistent part.
+			parts.Parts = append(parts.Parts, part)
 		}
 	}
-	progress.Finalizing()
+	info.progress.Finalizing()
 	// All parts uploaded, now complete the upload.
 	var finishResponse params.FinishUploadResponse
-	if err := c.PutWithResponse("/upload/"+uploadId, parts, &finishResponse); err != nil {
+	if err := c.PutWithResponse("/upload/"+info.UploadId, parts, &finishResponse); err != nil {
 		return 0, errgo.Mask(err)
 	}
-	url := fmt.Sprintf("/%s/resource/%s?upload-id=%s&filename=%s", id.Path(), name, uploadId, path)
+	url := fmt.Sprintf("/%s/resource/%s?upload-id=%s&filename=%s", info.id.Path(), info.resourceName, info.UploadId, info.path)
 
 	// The multipart upload has now been uploaded.
 	// Create the resource that uses it.
 	var resourceResp params.ResourceUploadResponse
-	if err := c.doWithResponse("POST", url, nil, &resourceResp); err != nil {
+	if err := c.DoWithResponse("POST", url, nil, &resourceResp); err != nil {
 		return -1, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
 	return resourceResp.Revision, nil
+}
+
+var (
+	errAlreadyUploaded = errgo.Newf("resource part already uploaded")
+	errFinished        = errgo.Newf("all resource parts uploaded")
+)
+
+// choosePartRange returns the file range to use for the part with the given index.
+// It returns errAlreadyUploaded if the part is complete and errFinished if the part is
+// at the end.
+func choosePartRange(partIndex int, offset int64, info *uploadInfo) (p0, p1 int64, err error) {
+	if offset >= info.size {
+		return info.size, info.size, errFinished
+	}
+	if partIndex < len(info.Parts.Parts) {
+		if part := info.Parts.Parts[partIndex]; part.Complete {
+			if part.Offset != offset {
+				return 0, 0, errgo.Newf("offset mismatch at part %d (want %d got %d)", partIndex, offset, part.Offset)
+			}
+			return offset, offset + part.Size, errAlreadyUploaded
+		}
+	}
+
+	nextOffset := info.size
+	nextUploadedPart := -1
+	// Find the offset of the next uploaded part, if any.
+	for i := partIndex + 1; i < len(info.Parts.Parts); i++ {
+		if info.Parts.Parts[i].Valid() {
+			nextOffset = info.Parts.Parts[i].Offset
+			nextUploadedPart = i
+			break
+		}
+	}
+	if nextUploadedPart == partIndex+1 {
+		// Exactly one part to fill in.
+		p0, p1 = offset, nextOffset
+		if p1-p0 < info.MinPartSize {
+			return 0, 0, errgo.Newf("remaining part is too small")
+		}
+		if p1-p0 > info.MaxPartSize {
+			return 0, 0, errgo.Newf("remaining part is too large")
+		}
+		return p0, p1, nil
+	}
+	if nextUploadedPart == -1 {
+		// No next part, so we can choose for ourselves.
+		p0 = offset
+		p1 = offset + info.preferredPartSize
+		if p1 > info.size {
+			p1 = info.size
+		}
+		return p0, p1, nil
+	}
+	// There's an already-uploaded part more than one away, so
+	// divide it equally (rounding errors will be allocated to the last
+	// part, which should be dealt with by the "exactly one part" case
+	// above).
+	partSize := (nextOffset - offset) / int64(nextUploadedPart-partIndex)
+	return offset, offset + partSize, nil
 }
 
 // progressReader implements an io.Reader that informs a Progress
@@ -431,7 +511,7 @@ func (c *Client) uploadPart(uploadId string, part int, r io.ReaderAt, p0, p1 int
 		}
 		req.Header.Set("Content-Type", "application/octet-stream")
 		req.ContentLength = p1 - p0
-		resp, err := c.Do(req, fmt.Sprintf("/upload/%s/%d?hash=%s", uploadId, part, hash))
+		resp, err := c.Do(req, fmt.Sprintf("/upload/%s/%d?hash=%s&offset=%d", uploadId, part, hash, p0))
 		if err == nil {
 			// Success
 			resp.Body.Close()
@@ -850,10 +930,13 @@ func (c *Client) Put(path string, val interface{}) error {
 // should be a pointer to the expected data, but may be nil if no result is
 // desired.
 func (c *Client) PutWithResponse(path string, val, result interface{}) error {
-	return c.doWithResponse("PUT", path, val, result)
+	return c.DoWithResponse("PUT", path, val, result)
 }
 
-func (c *Client) doWithResponse(method string, path string, val, result interface{}) error {
+// DoWithResponse is more general version of PutWithResponse. It performs
+// the given HTTP method on the given charm store path, sending
+// val as the JSON request body and unmarshaling the JSON response into result.
+func (c *Client) DoWithResponse(method string, path string, val, result interface{}) error {
 	data, err := json.Marshal(val)
 	if err != nil {
 		return errgo.Notef(err, "cannot marshal PUT body")

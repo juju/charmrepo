@@ -100,6 +100,7 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 		IdentityLocation:  s.identitySrv.URL.String(),
 		TermsLocation:     s.termsSrv.Location(),
 		MinUploadPartSize: 10,
+		MaxUploadPartSize: 200,
 		PublicKeyLocator:  httpbakery2u.NewPublicKeyRing(nil, nil),
 	}
 	c.Logf("identity location: %s; terms location %s", serverParams.IdentityLocation, serverParams.TermsLocation)
@@ -1839,6 +1840,15 @@ func (e errorReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 	return e.reader.ReadAt(p, off)
 }
 
+func (s *suite) TestResumeNonExistentUploadResource(c *gc.C) {
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	content := "abcdefghiujklmetc"
+	url := charm.MustParseURL("cs:~who/trusty/mysql")
+	_, err := s.client.ResumeUploadResource("badid", url, "resname", "data", strings.NewReader(content), int64(len(content)), &testProgress{c: c})
+	c.Assert(errgo.Cause(err), gc.Equals, csclient.ErrUploadNotFound)
+	c.Check(err, gc.ErrorMatches, `upload not found`)
+}
+
 func (s *suite) TestResumeUploadResource(c *gc.C) {
 	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
 
@@ -1880,10 +1890,169 @@ func (s *suite) TestResumeUploadResource(c *gc.C) {
 		startProgress{},
 		transferredProgress{10},
 		startProgress{},
+		transferredProgress{10},
 		transferredProgress{20},
 		transferredProgress{26},
 		finalizingProgress{},
 	})
+}
+
+type partRange struct {
+	p0, p1 int64
+}
+
+var resumeUploadResourceWithDifferentPartsTests = []struct {
+	about          string
+	size           int64
+	minPartSize    int64
+	ranges         []*partRange
+	expectError    string
+	expectProgress []interface{}
+}{{
+	about:       "single gap, longer than minPartSize",
+	size:        100,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, nil, {35, 100}},
+	expectProgress: []interface{}{
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{35},
+		transferredProgress{100},
+		finalizingProgress{},
+	},
+}, {
+	about:       "single gap longer than maxPartSize",
+	size:        250,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, nil, {230, 250}},
+	expectError: "remaining part is too large",
+}, {
+	about:       "single gap smaller than minPartSize",
+	size:        50,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, nil, {25, 50}},
+	expectError: "remaining part is too small",
+}, {
+	about:       "multiple part gap",
+	size:        100,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, nil, nil, nil, {80, 100}},
+	expectProgress: []interface{}{
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{40},
+		transferredProgress{60},
+		transferredProgress{80},
+		transferredProgress{100},
+		finalizingProgress{},
+	},
+}, {
+	about:       "multiple part gap with unequal division",
+	size:        100,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, nil, nil, nil, {90, 100}},
+	expectProgress: []interface{}{
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{43},
+		transferredProgress{66},
+		transferredProgress{90},
+		transferredProgress{100},
+		finalizingProgress{},
+	},
+}, {
+	about:       "gap at end",
+	size:        120,
+	minPartSize: 10,
+	ranges:      []*partRange{{0, 20}, {20, 60}, nil, nil, nil},
+	expectProgress: []interface{}{
+		startProgress{},
+		transferredProgress{20},
+		transferredProgress{60},
+		transferredProgress{70},
+		transferredProgress{80},
+		transferredProgress{90},
+		transferredProgress{100},
+		transferredProgress{110},
+		transferredProgress{120},
+		finalizingProgress{},
+	},
+}}
+
+func (s *suite) TestResumeUploadResourceWithDifferentParts(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	expectRev := 0
+	for i, test := range resumeUploadResourceWithDifferentPartsTests {
+		c.Logf("test %d: %v", i, test.about)
+		content := strings.Repeat(string('A'+i), int(test.size))
+		*csclient.MinMultipartUploadSize = test.minPartSize
+
+		uploadId := s.createPartialUpload(c, content, test.ranges)
+
+		progress := &testProgress{c: c}
+		rev, err := s.client.ResumeUploadResource(uploadId, url, "resname", "data", strings.NewReader(content), test.size, progress)
+		if test.expectError != "" {
+			c.Assert(err, gc.ErrorMatches, test.expectError)
+			continue
+		}
+		c.Assert(err, gc.Equals, nil)
+		c.Assert(rev, gc.Equals, expectRev)
+		expectRev++
+
+		// Check that we can download it OK.
+		getResult, err := s.client.GetResource(url, "resname", rev)
+		c.Assert(err, jc.ErrorIsNil)
+
+		expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(content)))
+		c.Check(getResult.Hash, gc.Equals, expectHash)
+
+		gotData, err := ioutil.ReadAll(getResult)
+		c.Assert(err, jc.ErrorIsNil)
+		getResult.Close()
+		c.Assert(string(gotData), gc.Equals, content)
+		c.Assert(progress.Collected, jc.DeepEquals, test.expectProgress)
+	}
+}
+
+// createPartialUpload creates a multipart resource upload with the given content,
+// putting one part for each non-nil element of parts. All fields in the Part structure
+// other than Offset and Size are ignored.
+//
+// It returns the id of the new upload.
+func (s *suite) createPartialUpload(c *gc.C, content string, ranges []*partRange) string {
+	var info params.UploadInfoResponse
+	// Create the upload.
+	err := s.client.DoWithResponse("POST", "/upload", nil, &info)
+	c.Assert(err, gc.Equals, nil)
+	for i, r := range ranges {
+		if r != nil {
+			s.putUploadPart(c, info.UploadId, i, *r, content)
+		}
+	}
+	return info.UploadId
+}
+
+func (s *suite) putUploadPart(c *gc.C, uploadId string, partIndex int, r partRange, content string) {
+	partContent := content[r.p0:r.p1]
+	hash := sha512.Sum384([]byte(partContent))
+	req, err := http.NewRequest("PUT", "", strings.NewReader(partContent))
+	c.Assert(err, gc.Equals, nil)
+	req.Header.Set("Content-Type", "application/octet-stream")
+	req.ContentLength = r.p1 - r.p0
+	resp, err := s.client.Do(req, fmt.Sprintf("/upload/%s/%d?hash=%x&offset=%d", uploadId, partIndex, hash, r.p0))
+	c.Assert(err, gc.Equals, nil)
+	resp.Body.Close()
 }
 
 func (s *suite) TestListResources(c *gc.C) {
@@ -2145,7 +2314,7 @@ type finalizingProgress struct {
 func (p *testProgress) Start(uploadId string, expires time.Time) {
 	p.Collected = append(p.Collected, startProgress{})
 	p.c.Assert(uploadId, gc.NotNil)
-	p.c.Assert(expires.After(time.Now()), gc.Equals, true)
+	p.c.Assert(expires.After(time.Now()), gc.Equals, true, gc.Commentf("expires %v", expires))
 	p.uploadId = uploadId
 }
 
