@@ -37,7 +37,7 @@ import (
 
 const apiVersion = "v5"
 
-var minMultipartUploadSize int64 = 5 * 1024 * 1024
+const defaultMinMultipartUploadSize = 5 * 1024 * 1024
 
 // ServerURL holds the default location of the global charm store.
 // An alternate location can be configured by changing the URL field in the
@@ -48,11 +48,12 @@ var ServerURL = "https://api.jujucharms.com/charmstore"
 
 // Client represents the client side of a charm store.
 type Client struct {
-	params        Params
-	bclient       httpClient
-	header        http.Header
-	statsDisabled bool
-	channel       params.Channel
+	params                 Params
+	bclient                httpClient
+	header                 http.Header
+	statsDisabled          bool
+	channel                params.Channel
+	minMultipartUploadSize int64
 }
 
 // Params holds parameters for creating a new charm store client.
@@ -92,9 +93,16 @@ func New(p Params) *Client {
 		bclient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
 	return &Client{
-		bclient: bclient,
-		params:  p,
+		bclient:                bclient,
+		params:                 p,
+		minMultipartUploadSize: defaultMinMultipartUploadSize,
 	}
+}
+
+// SetMinMultipartUploadSize sets the minimum size of resource upload
+// that will trigger a multipart upload. This is mainly useful for testing.
+func (c *Client) SetMinMultipartUploadSize(n int64) {
+	c.minMultipartUploadSize = n
 }
 
 // ServerURL returns the charm store URL used by the client.
@@ -253,7 +261,7 @@ func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, resourceNa
 		progress:     progress,
 		content:      content,
 	}
-	if size >= minMultipartUploadSize {
+	if size >= c.minMultipartUploadSize {
 		return c.uploadMultipartResource(uploadId, info)
 	}
 	return c.uploadSinglePartResource(info)

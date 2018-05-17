@@ -1675,7 +1675,7 @@ func (s *suite) TestUploadResource(c *gc.C) {
 }
 
 func (s *suite) TestUploadLargeResource(c *gc.C) {
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	s.client.SetMinMultipartUploadSize(int64(10))
 
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
@@ -1749,8 +1749,6 @@ func (p *failProxy) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 }
 
 func (s *suite) TestUploadLargeResourceProgressWhenGetting504(c *gc.C) {
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
-
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
 			"resname": {
@@ -1765,6 +1763,7 @@ func (s *suite) TestUploadLargeResourceProgressWhenGetting504(c *gc.C) {
 		User:     s.serverParams.AuthUsername,
 		Password: s.serverParams.AuthPassword,
 	})
+	client.SetMinMultipartUploadSize(int64(10))
 
 	url, err := client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
 	c.Assert(err, gc.IsNil)
@@ -1803,7 +1802,7 @@ func (s *suite) TestUploadLargeResourceProgressWhenGetting504(c *gc.C) {
 }
 
 func (s *suite) TestUploadLargeResourceWithHashMismatch(c *gc.C) {
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	s.client.SetMinMultipartUploadSize(int64(10))
 
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
@@ -1841,7 +1840,7 @@ func (e errorReaderAt) ReadAt(p []byte, off int64) (n int, err error) {
 }
 
 func (s *suite) TestResumeNonExistentUploadResource(c *gc.C) {
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	s.client.SetMinMultipartUploadSize(int64(10))
 	content := "abcdefghiujklmetc"
 	url := charm.MustParseURL("cs:~who/trusty/mysql")
 	_, err := s.client.ResumeUploadResource("badid", url, "resname", "data", strings.NewReader(content), int64(len(content)), &testProgress{c: c})
@@ -1850,7 +1849,7 @@ func (s *suite) TestResumeNonExistentUploadResource(c *gc.C) {
 }
 
 func (s *suite) TestResumeUploadResource(c *gc.C) {
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	s.client.SetMinMultipartUploadSize(int64(10))
 
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
@@ -1991,12 +1990,12 @@ func (s *suite) TestResumeUploadResourceWithDifferentParts(c *gc.C) {
 	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
 	c.Assert(err, gc.IsNil)
 
-	s.PatchValue(csclient.MinMultipartUploadSize, int64(10))
+	s.client.SetMinMultipartUploadSize(int64(10))
 	expectRev := 0
 	for i, test := range resumeUploadResourceWithDifferentPartsTests {
 		c.Logf("test %d: %v", i, test.about)
 		content := strings.Repeat(string('A'+i), int(test.size))
-		*csclient.MinMultipartUploadSize = test.minPartSize
+		s.client.SetMinMultipartUploadSize(test.minPartSize)
 
 		uploadId := s.createPartialUpload(c, content, test.ranges)
 
