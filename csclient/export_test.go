@@ -4,7 +4,6 @@
 package csclient // import "gopkg.in/juju/charmrepo.v4/csclient"
 
 var (
-	Hyphenate              = hyphenate
-	MinMultipartUploadSize = &minMultipartUploadSize
-	UploadArchive          = (*Client).uploadArchive
+	Hyphenate     = hyphenate
+	UploadArchive = (*Client).uploadArchive
 )
