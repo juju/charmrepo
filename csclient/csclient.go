@@ -244,6 +244,39 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.Reader
 	return c.ResumeUploadResource("", id, name, path, file, size, progress)
 }
 
+// AddDockerResource adds a reference to a docker image that is available in a docker
+// registry as a resource to the charm with the given id. If imageName is non-empty,
+// it names the image in some non-charmstore-associated registry; otherwise
+// the image should have been uploaded to the charmstore-associated registry
+// (see DockerResourceUploadInfo for details on how to do that).
+// The digest should hold the digest of the image (in "sha256:hex" format).
+//
+// AddDockerResource returns the revision of the newly added resource.
+func (c *Client) AddDockerResource(id *charm.URL, resourceName string, imageName, digest string) (revision int, err error) {
+	path := fmt.Sprintf("/%s/resource/%s", id.Path(), resourceName)
+	var result params.ResourceUploadResponse
+	if err := c.DoWithResponse("POST", path, params.DockerResourceUploadRequest{
+		Digest:    digest,
+		ImageName: imageName,
+	}, &result); err != nil {
+		return 0, errgo.Mask(err)
+	}
+	return result.Revision, nil
+}
+
+// DockerResourceUploadInfo returns information on how to upload an image
+// to the charm store's associated docker registry.
+// The returned information includes a tag to associated with the image
+// and username and password to use for push authentication.
+func (c *Client) DockerResourceUploadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
+	path := fmt.Sprintf("/%s/docker-resource-upload-info?resource-name=%s", id.Path(), url.QueryEscape(resourceName))
+	var result params.DockerInfoResponse
+	if err := c.DoWithResponse("GET", path, nil, &result); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &result, nil
+}
+
 var ErrUploadNotFound = errgo.Newf("upload not found")
 
 // ResumeUploadResource is like UploadResource except that if uploadId is non-empty,
