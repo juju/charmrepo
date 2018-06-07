@@ -368,6 +368,30 @@ type ResourceUploadResponse struct {
 	Revision int
 }
 
+// DockerResourceUploadRequest holds the body of a POST to /:id/resources/:name
+// when the resource is a docker image.
+type DockerResourceUploadRequest struct {
+	// ImageName holds the image name when it's an external image not
+	// contained within the charm store's registry. If this is empty, the
+	// image should have been uploaded to the charm store's registry.
+	ImageName string
+	// Digest holds the digest of the image, in the form "sha256:hexbytes".
+	Digest    string
+}
+
+// DockerInfoResponse holds the result of a get of /:id/resources/:name/docker-info
+type DockerInfoResponse struct {
+	// ImageName holds the image name (including host) of the resource in the docker registry.
+	ImageName string
+
+	// Username holds the username to use in the docker auth information.
+	// (see https://docs.docker.com/registry/spec/auth/token/#requesting-a-token).
+	Username string
+
+	// Password holds the password to use in the docker auth information.
+	Password string
+}
+
 // CharmRevision holds the revision number of a charm and any error
 // encountered in retrieving it.
 type CharmRevision struct {
