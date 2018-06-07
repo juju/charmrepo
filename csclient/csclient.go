@@ -266,6 +266,41 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.Reader
 	return c.ResumeUploadResource("", id, name, path, file, size, progress)
 }
 
+// AddDockerResource adds a reference to a docker image that is available in a docker
+// registry as a resource to the charm with the given id. If imageName is non-empty,
+// it names the image in some non-charmstore-associated registry; otherwise
+// the image should have been uploaded to the charmstore-associated registry
+// (see DockerResourceUploadInfo for details on how to do that).
+// The digest should hold the digest of the image (in "sha256:hex" format).
+//
+// AddDockerResource returns the revision of the newly added resource.
+func (c *Client) AddDockerResource(id *charm.URL, resourceName string, imageName, digest string) (revision int, err error) {
+	path := fmt.Sprintf("/%s/resource/%s", id.Path(), resourceName)
+	var result params.ResourceUploadResponse
+	if err := c.DoWithResponse("POST", path, params.DockerResourceUploadRequest{
+		Digest:    digest,
+		ImageName: imageName,
+	}, &result); err != nil {
+		return 0, errgo.Mask(err)
+	}
+	return result.Revision, nil
+}
+
+// DockerResourceUploadInfo returns information on how to upload an image
+// to the charm store's associated docker registry.
+// The returned information includes a tag to associated with the image
+// and username and password to use for push authentication.
+func (c *Client) DockerResourceUploadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
+	path := fmt.Sprintf("/%s/docker-resource-upload-info?resource-name=%s", id.Path(), url.QueryEscape(resourceName))
+	var result params.DockerInfoResponse
+	if err := c.DoWithResponse("GET", path, nil, &result); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &result, nil
+}
+
+var ErrUploadNotFound = errgo.Newf("upload not found")
+
 // ResumeUploadResource is like UploadResource except that if uploadId is non-empty,
 // it specifies the id of an existing upload to resume.
 func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, name, path string, file io.ReaderAt, size int64, progress Progress) (revision int, err error) {
@@ -324,7 +359,7 @@ func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file 
 	if len(uploadId) == 0 {
 		// Create the upload.
 		var resp params.NewUploadResponse
-		if err := c.doWithResponse("POST", "/upload", nil, &resp); err != nil {
+		if err := c.DoWithResponse("POST", "/upload", nil, &resp); err != nil {
 			if errgo.Cause(err) == params.ErrNotFound {
 				// An earlier version of the API - try single part upload even though it's big.
 				return c.uploadSinglePartResource(id, name, path, file, size, progress)
@@ -338,7 +373,7 @@ func (c *Client) uploadMultipartResource(id *charm.URL, name, path string, file 
 		maxPartSize = resp.MaxPartSize
 	} else {
 		var resp params.UploadInfoResponse
-		if err := c.doWithResponse("GET", "/upload/"+uploadId, nil, &resp); err != nil {
+		if err := c.DoWithResponse("GET", "/upload/"+uploadId, nil, &resp); err != nil {
 			if err != nil {
 				return 0, errgo.Mask(err, errgo.Is(params.ErrNotFound))
 			}
@@ -404,7 +439,7 @@ func (c *Client) uploadParts(id *charm.URL, name, path string, uploadId string, 
 	// The multipart upload has now been uploaded.
 	// Create the resource that uses it.
 	var resourceResp params.ResourceUploadResponse
-	if err := c.doWithResponse("POST", url, nil, &resourceResp); err != nil {
+	if err := c.DoWithResponse("POST", url, nil, &resourceResp); err != nil {
 		return -1, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
 	return resourceResp.Revision, nil
@@ -888,10 +923,10 @@ func (c *Client) Put(path string, val interface{}) error {
 // should be a pointer to the expected data, but may be nil if no result is
 // desired.
 func (c *Client) PutWithResponse(path string, val, result interface{}) error {
-	return c.doWithResponse("PUT", path, val, result)
+	return c.DoWithResponse("PUT", path, val, result)
 }
 
-func (c *Client) doWithResponse(method string, path string, val, result interface{}) error {
+func (c *Client) DoWithResponse(method string, path string, val, result interface{}) error {
 	req, _ := http.NewRequest(method, "", nil)
 	req.Header.Set("Content-Type", "application/json")
 	data, err := json.Marshal(val)
