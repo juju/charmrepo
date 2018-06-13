@@ -95,13 +95,14 @@ func (s *suite) startServer(c *gc.C, session *mgo.Session) {
 	s.termsSrv.CheckerP = s.termsChecker
 
 	serverParams := charmstore.ServerParams{
-		AuthUsername:      "test-user",
-		AuthPassword:      "test-password",
-		IdentityLocation:  s.identitySrv.URL.String(),
-		TermsLocation:     s.termsSrv.Location(),
-		MinUploadPartSize: 10,
-		MaxUploadPartSize: 200,
-		PublicKeyLocator:  httpbakery2u.NewPublicKeyRing(nil, nil),
+		AuthUsername:          "test-user",
+		AuthPassword:          "test-password",
+		IdentityLocation:      s.identitySrv.URL.String(),
+		TermsLocation:         s.termsSrv.Location(),
+		MinUploadPartSize:     10,
+		MaxUploadPartSize:     200,
+		PublicKeyLocator:      httpbakery2u.NewPublicKeyRing(nil, nil),
+		DockerRegistryAddress: "0.1.2.3",
 	}
 	c.Logf("identity location: %s; terms location %s", serverParams.IdentityLocation, serverParams.TermsLocation)
 
@@ -385,6 +386,7 @@ func (s *suite) TestPutWithResponseSuccess(c *gc.C) {
 	// on PUT, so we'll create a fake server just to test
 	// the PutWithResponse method.
 	handler := func(w http.ResponseWriter, req *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
 		io.Copy(w, req.Body)
 	}
 	srv := httptest.NewServer(http.HandlerFunc(handler))
@@ -691,15 +693,18 @@ var uploadArchiveWithBadResponseTests = []struct {
 }, {
 	about: "invalid JSON in body",
 	response: &http.Response{
-		Status:        "200 OK",
-		StatusCode:    200,
-		Proto:         "HTTP/1.0",
-		ProtoMajor:    1,
-		ProtoMinor:    0,
-		Body:          ioutil.NopCloser(strings.NewReader("no id here")),
+		Status:     "200 OK",
+		StatusCode: 200,
+		Proto:      "HTTP/1.0",
+		ProtoMajor: 1,
+		ProtoMinor: 0,
+		Body:       ioutil.NopCloser(strings.NewReader("no id here")),
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
 		ContentLength: 0,
 	},
-	expectError: `cannot unmarshal response "no id here": .*`,
+	expectError: `cannot unmarshal response: .*`,
 }}
 
 func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
@@ -984,27 +989,33 @@ var getWithBadResponseTests = []struct {
 }, {
 	about: "body read error",
 	response: &http.Response{
-		Status:        "200 OK",
-		StatusCode:    200,
-		Proto:         "HTTP/1.0",
-		ProtoMajor:    1,
-		ProtoMinor:    0,
+		Status:     "200 OK",
+		StatusCode: 200,
+		Proto:      "HTTP/1.0",
+		ProtoMajor: 1,
+		ProtoMinor: 0,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
 		Body:          ioutil.NopCloser(&errorReader{"body read error"}),
 		ContentLength: -1,
 	},
-	expectError: "cannot read response body: body read error",
+	expectError: "cannot unmarshal response: error reading response body: body read error",
 }, {
 	about: "badly formatted json response",
 	response: &http.Response{
-		Status:        "200 OK",
-		StatusCode:    200,
-		Proto:         "HTTP/1.0",
-		ProtoMajor:    1,
-		ProtoMinor:    0,
+		Status:     "200 OK",
+		StatusCode: 200,
+		Proto:      "HTTP/1.0",
+		ProtoMajor: 1,
+		ProtoMinor: 0,
+		Header: http.Header{
+			"Content-Type": {"application/json"},
+		},
 		Body:          ioutil.NopCloser(strings.NewReader("bad")),
 		ContentLength: -1,
 	},
-	expectError: `cannot unmarshal response "bad": .*`,
+	expectError: `cannot unmarshal response: .*`,
 }, {
 	about: "badly formatted json error",
 	response: &http.Response{
@@ -2255,7 +2266,7 @@ func (s *suite) TestDockerResourceUploadInfo(c *gc.C) {
 
 	info, err := s.client.DockerResourceUploadInfo(url, "r1")
 	c.Assert(err, gc.IsNil)
-	c.Assert(info.ImageName, gc.Equals, "/who/ktest/r1")
+	c.Assert(info.ImageName, gc.Equals, "0.1.2.3/who/ktest/r1")
 	c.Assert(info.Username, gc.Equals, "docker-uploader")
 	c.Assert(info.Password, gc.Not(gc.Equals), "")
 }
@@ -2263,6 +2274,32 @@ func (s *suite) TestDockerResourceUploadInfo(c *gc.C) {
 func (s *suite) TestDockerResourceUploadInfoNotFound(c *gc.C) {
 	_, err := s.client.DockerResourceUploadInfo(charm.MustParseURL("cs:~who/ktest"), "r1")
 	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for cs:~who/ktest`)
+}
+
+func (s *suite) TestDockerResourceDownloadInfo(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Type:        resource.TypeDocker,
+				Description: "r1 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/ktest")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	rev, err := s.client.AddDockerResource(url, "r1", "", "sha256:0a69ca95710aa3fb5a9f8b60cbe2cb5f25485a6c739dd9d95e16c1e8d51d57b4319ac7d1daeaf8f7399e13f3d280c239407f6ea6016ed325c6304dd97c17c296")
+	c.Assert(err, gc.IsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	info, err := s.client.DockerResourceDownloadInfo(url, "r1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(info.ImageName, gc.Equals, "0.1.2.3/who/ktest/r1@sha256:0a69ca95710aa3fb5a9f8b60cbe2cb5f25485a6c739dd9d95e16c1e8d51d57b4319ac7d1daeaf8f7399e13f3d280c239407f6ea6016ed325c6304dd97c17c296")
+	c.Assert(info.Username, gc.Equals, "docker-registry")
+	c.Assert(info.Password, gc.Not(gc.Equals), "")
 }
 
 func (s *suite) TestAddDockerResource(c *gc.C) {
