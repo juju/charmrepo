@@ -2238,6 +2238,58 @@ func (s *suite) addCharm(c *gc.C, urlStr, name string) (charm.Charm, *charm.URL)
 	return ch, id
 }
 
+func (s *suite) TestDockerResourceUploadInfo(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Type:        resource.TypeDocker,
+				Description: "r1 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/ktest")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	info, err := s.client.DockerResourceUploadInfo(url, "r1")
+	c.Assert(err, gc.IsNil)
+	c.Assert(info.ImageName, gc.Equals, "/who/ktest/r1")
+	c.Assert(info.Username, gc.Equals, "docker-uploader")
+	c.Assert(info.Password, gc.Not(gc.Equals), "")
+}
+
+func (s *suite) TestDockerResourceUploadInfoNotFound(c *gc.C) {
+	_, err := s.client.DockerResourceUploadInfo(charm.MustParseURL("cs:~who/ktest"), "r1")
+	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for cs:~who/ktest`)
+}
+
+func (s *suite) TestAddDockerResource(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Type:        resource.TypeDocker,
+				Description: "r1 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/ktest")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	rev, err := s.client.AddDockerResource(url, "r1", "", "sha256:0a69ca95710aa3fb5a9f8b60cbe2cb5f25485a6c739dd9d95e16c1e8d51d57b4319ac7d1daeaf8f7399e13f3d280c239407f6ea6016ed325c6304dd97c17c296")
+	c.Assert(err, gc.IsNil)
+	c.Assert(rev, gc.Equals, 0)
+}
+
+func (s *suite) TestAddDockerResourceNotFound(c *gc.C) {
+	_, err := s.client.AddDockerResource(charm.MustParseURL("cs:~who/ktest"), "r1", "", "sha256:0a69ca95710aa3fb5a9f8b60cbe2cb5f25485a6c739dd9d95e16c1e8d51d57b4319ac7d1daeaf8f7399e13f3d280c239407f6ea6016ed325c6304dd97c17c296")
+	c.Assert(err, gc.ErrorMatches, `no matching charm or bundle for cs:~who/ktest`)
+}
+
 // hashOfCharm returns the SHA256 hash sum for the given charm name.
 func hashOfCharm(c *gc.C, name string) string {
 	path := charmRepo.CharmArchivePath(c.MkDir(), name)
