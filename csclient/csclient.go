@@ -29,6 +29,7 @@ import (
 	"unicode"
 
 	"gopkg.in/errgo.v1"
+	httprequest "gopkg.in/httprequest.v1"
 	"gopkg.in/juju/charm.v6"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
@@ -264,9 +265,23 @@ func (c *Client) AddDockerResource(id *charm.URL, resourceName string, imageName
 	return result.Revision, nil
 }
 
+// DockerResourceDownloadInfo returns information on how
+// to download the given resource in the given Kubernetes charm
+// from a docker registry. The returned information
+// includes the image name to use and the username and password
+// to use for authentication.
+func (c *Client) DockerResourceDownloadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
+	path := fmt.Sprintf("/%s/resource/%s", id.Path(), resourceName)
+	var result params.DockerInfoResponse
+	if err := c.Get(path, &result); err != nil {
+		return nil, errgo.Mask(err)
+	}
+	return &result, nil
+}
+
 // DockerResourceUploadInfo returns information on how to upload an image
 // to the charm store's associated docker registry.
-// The returned information includes a tag to associated with the image
+// The returned information includes a tag to associate with the image
 // and username and password to use for push authentication.
 func (c *Client) DockerResourceUploadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
 	path := fmt.Sprintf("/%s/docker-resource-upload-info?resource-name=%s", id.Path(), url.QueryEscape(resourceName))
@@ -325,7 +340,7 @@ func (c *Client) uploadSinglePartResource(info *uploadInfo) (revision int, err e
 
 	// Parse the response.
 	var result params.ResourceUploadResponse
-	if err := parseResponseBody(resp.Body, &result); err != nil {
+	if err := httprequest.UnmarshalJSONResponse(resp, &result); err != nil {
 		return 0, errgo.Mask(err)
 	}
 	return result.Revision, nil
@@ -786,8 +801,8 @@ func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 
 	// Parse the response.
 	var result params.ArchiveUploadResponse
-	if err := parseResponseBody(resp.Body, &result); err != nil {
-		return nil, errgo.Mask(err)
+	if err := httprequest.UnmarshalJSONResponse(resp, &result); err != nil {
+		return nil, errgo.NoteMask(err, "cannot unmarshal response", errgo.Any)
 	}
 	return result.Id, nil
 }
@@ -951,8 +966,8 @@ func (c *Client) Get(path string, result interface{}) error {
 	}
 	defer resp.Body.Close()
 	// Parse the response.
-	if err := parseResponseBody(resp.Body, result); err != nil {
-		return errgo.Mask(err)
+	if err := httprequest.UnmarshalJSONResponse(resp, result); err != nil {
+		return errgo.Notef(err, "cannot unmarshal response")
 	}
 	return nil
 }
@@ -990,23 +1005,8 @@ func (c *Client) DoWithResponse(method string, path string, val, result interfac
 	}
 	defer resp.Body.Close()
 	// Parse the response.
-	if err := parseResponseBody(resp.Body, result); err != nil {
+	if err := httprequest.UnmarshalJSONResponse(resp, result); err != nil {
 		return errgo.Mask(err)
-	}
-	return nil
-}
-
-func parseResponseBody(body io.Reader, result interface{}) error {
-	data, err := ioutil.ReadAll(body)
-	if err != nil {
-		return errgo.Notef(err, "cannot read response body")
-	}
-	if result == nil {
-		// The caller doesn't care about the response body.
-		return nil
-	}
-	if err := json.Unmarshal(data, result); err != nil {
-		return errgo.Notef(err, "cannot unmarshal response %q", sizeLimit(data))
 	}
 	return nil
 }
