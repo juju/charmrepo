@@ -376,7 +376,7 @@ type DockerResourceUploadRequest struct {
 	// image should have been uploaded to the charm store's registry.
 	ImageName string
 	// Digest holds the digest of the image, in the form "sha256:hexbytes".
-	Digest    string
+	Digest string
 }
 
 // DockerInfoResponse holds the result of a get of /:id/resources/:name/docker-info
