@@ -613,11 +613,11 @@ type ResourceData struct {
 // for the given charm, returning a reader its data can be read from,  the
 // SHA384 hash of the data.
 //
+// If revision is negative, the currently published resource for the Client's
+// channel will be returned.
+//
 // Note that the result must be closed after use.
 func (c *Client) GetResource(id *charm.URL, name string, revision int) (result ResourceData, err error) {
-	if revision < 0 {
-		return result, errgo.New("revision must be a non-negative integer")
-	}
 	// Create the request.
 	req, err := http.NewRequest("GET", "", nil)
 	if err != nil {
