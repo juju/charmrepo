@@ -1672,17 +1672,37 @@ func (s *suite) TestUploadResource(c *gc.C) {
 		c.Assert(rev, gc.Equals, i)
 
 		// Check that we can download it OK.
-		getResult, err := s.client.GetResource(url, "resname", i)
-		c.Assert(err, jc.ErrorIsNil)
-		defer getResult.Close()
-
-		expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(data)))
-		c.Assert(getResult.Hash, gc.Equals, expectHash)
-
-		gotData, err := ioutil.ReadAll(getResult)
-		c.Assert(err, jc.ErrorIsNil)
-		c.Assert(string(gotData), gc.Equals, data)
+		assertGetResource(c, s.client, url, "resname", i, data)
 	}
+}
+
+func (s *suite) TestDownloadLatestResource(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo.zip",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	for i := 0; i < 4; i++ {
+		// Upload the resource.
+		data := fmt.Sprintf("boo!%d", i)
+		rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data), int64(len(data)), nil)
+		c.Assert(err, jc.ErrorIsNil)
+		c.Assert(rev, gc.Equals, i)
+	}
+	err = s.client.Publish(url, []params.Channel{params.StableChannel}, map[string]int{"resname": 1})
+	c.Assert(err, jc.ErrorIsNil)
+	err = s.client.Publish(url, []params.Channel{params.EdgeChannel}, map[string]int{"resname": 2})
+	c.Assert(err, jc.ErrorIsNil)
+
+	assertGetResource(c, s.client.WithChannel(params.StableChannel), url, "resname", -1, "boo!1")
+	assertGetResource(c, s.client.WithChannel(params.EdgeChannel), url, "resname", -1, "boo!2")
+	assertGetResource(c, s.client.WithChannel(params.UnpublishedChannel), url, "resname", -1, "boo!3")
 }
 
 func (s *suite) TestUploadLargeResource(c *gc.C) {
@@ -2434,4 +2454,17 @@ func (r *readerChangingUnderfoot) ReadAt(buf []byte, off int64) (int, error) {
 		r.content[i] = 'x'
 	}
 	return n, nil
+}
+
+func assertGetResource(c *gc.C, client *csclient.Client, url *charm.URL, resourceName string, rev int, expectData string) {
+	getResult, err := client.GetResource(url, "resname", rev)
+	c.Assert(err, jc.ErrorIsNil)
+	defer getResult.Close()
+
+	gotData, err := ioutil.ReadAll(getResult)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(string(gotData), gc.Equals, expectData)
+
+	expectHash := fmt.Sprintf("%x", sha512.Sum384([]byte(expectData)))
+	c.Assert(getResult.Hash, gc.Equals, expectHash)
 }
