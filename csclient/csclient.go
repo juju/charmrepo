@@ -270,8 +270,11 @@ func (c *Client) AddDockerResource(id *charm.URL, resourceName string, imageName
 // from a docker registry. The returned information
 // includes the image name to use and the username and password
 // to use for authentication.
-func (c *Client) DockerResourceDownloadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
+func (c *Client) DockerResourceDownloadInfo(id *charm.URL, resourceName string, revision int) (*params.DockerInfoResponse, error) {
 	path := fmt.Sprintf("/%s/resource/%s", id.Path(), resourceName)
+	if revision >= 0 {
+		path += fmt.Sprintf("/%d", revision)
+	}
 	var result params.DockerInfoResponse
 	if err := c.Get(path, &result); err != nil {
 		return nil, errgo.Mask(err)

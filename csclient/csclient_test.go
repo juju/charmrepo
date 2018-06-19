@@ -2315,11 +2315,51 @@ func (s *suite) TestDockerResourceDownloadInfo(c *gc.C) {
 	c.Assert(err, gc.IsNil)
 	c.Assert(rev, gc.Equals, 0)
 
-	info, err := s.client.DockerResourceDownloadInfo(url, "r1")
+	info, err := s.client.DockerResourceDownloadInfo(url, "r1", 0)
 	c.Assert(err, gc.IsNil)
 	c.Assert(info.ImageName, gc.Equals, "0.1.2.3/who/ktest/r1@sha256:0a69ca95710aa3fb5a9f8b60cbe2cb5f25485a6c739dd9d95e16c1e8d51d57b4319ac7d1daeaf8f7399e13f3d280c239407f6ea6016ed325c6304dd97c17c296")
 	c.Assert(info.Username, gc.Equals, "docker-registry")
 	c.Assert(info.Password, gc.Not(gc.Equals), "")
+}
+
+func (s *suite) TestDockerResourceDownloadInfoLatest(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Series: []string{"kubernetes"},
+		Resources: map[string]resource.Meta{
+			"r1": {
+				Name:        "r1",
+				Type:        resource.TypeDocker,
+				Description: "r1 description",
+			},
+		},
+	})
+	url := charm.MustParseURL("cs:~who/ktest")
+	url, err := s.client.UploadCharm(url, ch)
+	c.Assert(err, gc.IsNil)
+
+	rev, err := s.client.AddDockerResource(url, "r1", "", "sha256:2d466e55f49f5b466a74473ba2d8db0d4f2b4a9a92ab312c9d391cf612b44648")
+	c.Assert(err, gc.IsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	rev, err = s.client.AddDockerResource(url, "r1", "", "sha256:c61c7057e20756c1c38595fc5d0249d3e7cd5fea8fc1e6e01bcda1c6980c9e42")
+	c.Assert(err, gc.IsNil)
+	c.Assert(rev, gc.Equals, 1)
+
+	err = s.client.Publish(url, []params.Channel{params.StableChannel}, map[string]int{"r1": 0})
+	c.Assert(err, jc.ErrorIsNil)
+
+	info, err := s.client.WithChannel(params.StableChannel).DockerResourceDownloadInfo(url, "r1", -1)
+	c.Assert(err, gc.IsNil)
+	c.Assert(info.ImageName, gc.Equals, "0.1.2.3/who/ktest/r1@sha256:2d466e55f49f5b466a74473ba2d8db0d4f2b4a9a92ab312c9d391cf612b44648")
+	c.Assert(info.Username, gc.Equals, "docker-registry")
+	c.Assert(info.Password, gc.Not(gc.Equals), "")
+
+	info, err = s.client.WithChannel(params.UnpublishedChannel).DockerResourceDownloadInfo(url, "r1", -1)
+	c.Assert(err, gc.IsNil)
+	c.Assert(info.ImageName, gc.Equals, "0.1.2.3/who/ktest/r1@sha256:c61c7057e20756c1c38595fc5d0249d3e7cd5fea8fc1e6e01bcda1c6980c9e42")
+	c.Assert(info.Username, gc.Equals, "docker-registry")
+	c.Assert(info.Password, gc.Not(gc.Equals), "")
+
 }
 
 func (s *suite) TestAddDockerResource(c *gc.C) {
