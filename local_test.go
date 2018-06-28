@@ -123,7 +123,7 @@ func (s *LocalRepoSuite) TestIgnoresUnpromisingNames(c *gc.C) {
 
 	_, err = s.repo.Get(charmURL)
 	s.checkNotFoundErr(c, err, charmURL)
-	c.Assert(c.GetTestLog(), gc.Equals, "")
+	c.Assert(c.GetTestLog(), gc.Matches, ".*juju\\.charm charm is not in revision control directory\n")
 }
 
 func (s *LocalRepoSuite) TestFindsSymlinks(c *gc.C) {
