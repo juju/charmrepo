@@ -37,7 +37,7 @@ gopkg.in/goose.v2	git	455416024500800de8dadbcacfa22681b6bb818d	2017-09-04T09:17:
 gopkg.in/httprequest.v1	git	3531529dedf047a744dd77f5262515aefff8cd48	2018-03-19T12:54:57Z
 gopkg.in/juju/charm.v6	git	5fbb467f7f759a4a2890fc5da0abe4b9b1df20fa	2018-06-29T06:08:46Z
 gopkg.in/juju/charmstore.v5	git	d93d0fd2b81b8230bdf9b1be91b50538dd8782fa	2018-06-28T08:11:03Z
-gopkg.in/juju/jujusvg.v3	git	b69768dfdf884defd0eaf7b7f3c4e04372922d05	2018-06-28T07:42:25Z
+gopkg.in/juju/jujusvg.v3	git	1ebf5c5481e815de683e57e0f46705ac567e4e58	2018-06-29T06:57:38Z
 gopkg.in/juju/names.v2	git	e38bc90539f22af61a9c656d35068bd5f0a5b30a	2016-05-25T23:07:23Z
 gopkg.in/juju/worker.v1	git	8b18096b52dc89d0160eea0a6484175f2b80aa0d	2016-10-03T16:17:01Z
 gopkg.in/macaroon-bakery.v2-unstable	git	5a131df02b2333d5d75c501743cbc2948ee9bbf0	2016-06-23T14:27:47Z
