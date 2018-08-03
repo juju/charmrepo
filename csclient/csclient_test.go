@@ -2153,7 +2153,7 @@ func (s *suite) TestDockerResourceUploadInfo(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"r1": {
 				Name:        "r1",
-				Type:        resource.TypeDocker,
+				Type:        resource.TypeContainerImage,
 				Description: "r1 description",
 			},
 		},
@@ -2180,7 +2180,7 @@ func (s *suite) TestDockerResourceDownloadInfo(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"r1": {
 				Name:        "r1",
-				Type:        resource.TypeDocker,
+				Type:        resource.TypeContainerImage,
 				Description: "r1 description",
 			},
 		},
@@ -2206,7 +2206,7 @@ func (s *suite) TestAddDockerResource(c *gc.C) {
 		Resources: map[string]resource.Meta{
 			"r1": {
 				Name:        "r1",
-				Type:        resource.TypeDocker,
+				Type:        resource.TypeContainerImage,
 				Description: "r1 description",
 			},
 		},
