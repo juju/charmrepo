@@ -712,7 +712,7 @@ func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
 	for i, test := range uploadArchiveWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
 		cl := badResponseClient(test.response, test.error)
-		id, err := csclient.UploadArchive(cl, id, strings.NewReader(fakeContent), fakeHash, fakeSize, -1)
+		id, err := cl.UploadArchive(id, strings.NewReader(fakeContent), fakeHash, fakeSize, -1)
 		c.Assert(id, gc.IsNil)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
@@ -730,7 +730,7 @@ func (s *suite) TestUploadArchiveWithServerError(c *gc.C) {
 
 	// Send an invalid hash so that the server returns an error.
 	url := charm.MustParseURL("~charmers/trusty/wordpress")
-	id, err := csclient.UploadArchive(s.client, url, body, strings.Repeat("0", len(hash)), size, -1)
+	id, err := s.client.UploadArchive(url, body, strings.Repeat("0", len(hash)), size, -1)
 	c.Assert(id, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, "cannot post archive: cannot put archive blob: hash mismatch")
 }
@@ -741,7 +741,7 @@ func (s *suite) checkUploadArchive(c *gc.C, path, url, expectId string) {
 	defer body.Close()
 
 	// Post the archive.
-	id, err := csclient.UploadArchive(s.client, charm.MustParseURL(url), body, hash, size, -1)
+	id, err := s.client.UploadArchive(charm.MustParseURL(url), body, hash, size, -1)
 	c.Assert(err, gc.IsNil)
 	c.Assert(id.String(), gc.Equals, expectId)
 
