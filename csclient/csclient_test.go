@@ -656,6 +656,30 @@ func (s *suite) TestUploadArchiveWithCharm(c *gc.C) {
 	s.checkUploadArchive(c, path, "~charmers/utopic/wordpress", "cs:~charmers/utopic/wordpress-1")
 }
 
+func (s *suite) TestUploadArchiveWithChannels(c *gc.C) {
+	path := charmRepo.CharmArchivePath(c.MkDir(), "wordpress")
+
+	body, hash, size := archiveHashAndSize(c, path)
+	defer body.Close()
+
+	url := charm.MustParseURL("cs:~charmers/utopic/wordpress-99")
+	id, err := s.client.UploadArchive(url, body, hash, size, -1, []params.Channel{
+		params.EdgeChannel,
+		params.CandidateChannel,
+	})
+	c.Assert(err, gc.IsNil)
+	var meta struct {
+		Published params.PublishedResponse
+	}
+	_, err = s.client.Meta(id, &meta)
+	c.Assert(err, gc.IsNil)
+	c.Assert(meta.Published.Info, jc.DeepEquals, []params.PublishedInfo{{
+		Channel: params.CandidateChannel,
+	}, {
+		Channel: params.EdgeChannel,
+	}})
+}
+
 func (s *suite) prepareBundleCharms(c *gc.C) {
 	// Add the charms required by the wordpress-simple bundle to the store.
 	err := s.client.UploadCharmWithRevision(
@@ -712,7 +736,7 @@ func (s *suite) TestUploadArchiveWithBadResponse(c *gc.C) {
 	for i, test := range uploadArchiveWithBadResponseTests {
 		c.Logf("test %d: %s", i, test.about)
 		cl := badResponseClient(test.response, test.error)
-		id, err := cl.UploadArchive(id, strings.NewReader(fakeContent), fakeHash, fakeSize, -1)
+		id, err := cl.UploadArchive(id, strings.NewReader(fakeContent), fakeHash, fakeSize, -1, nil)
 		c.Assert(id, gc.IsNil)
 		c.Assert(err, gc.ErrorMatches, test.expectError)
 	}
@@ -730,7 +754,7 @@ func (s *suite) TestUploadArchiveWithServerError(c *gc.C) {
 
 	// Send an invalid hash so that the server returns an error.
 	url := charm.MustParseURL("~charmers/trusty/wordpress")
-	id, err := s.client.UploadArchive(url, body, strings.Repeat("0", len(hash)), size, -1)
+	id, err := s.client.UploadArchive(url, body, strings.Repeat("0", len(hash)), size, -1, nil)
 	c.Assert(id, gc.IsNil)
 	c.Assert(err, gc.ErrorMatches, "cannot post archive: cannot put archive blob: hash mismatch")
 }
@@ -741,7 +765,7 @@ func (s *suite) checkUploadArchive(c *gc.C, path, url, expectId string) {
 	defer body.Close()
 
 	// Post the archive.
-	id, err := s.client.UploadArchive(charm.MustParseURL(url), body, hash, size, -1)
+	id, err := s.client.UploadArchive(charm.MustParseURL(url), body, hash, size, -1, nil)
 	c.Assert(err, gc.IsNil)
 	c.Assert(id.String(), gc.Equals, expectId)
 
