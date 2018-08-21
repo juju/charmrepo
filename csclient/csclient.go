@@ -689,7 +689,7 @@ func (c *Client) UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error) 
 		return nil, errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	return c.uploadArchive(id, r, hash, size, -1)
+	return c.UploadArchive(id, r, hash, size, -1)
 }
 
 // UploadCharmWithRevision uploads the given charm to the
@@ -708,7 +708,7 @@ func (c *Client) UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulga
 		return errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	_, err = c.uploadArchive(id, r, hash, size, promulgatedRevision)
+	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision)
 	return errgo.Mask(err, isAPIError)
 }
 
@@ -728,7 +728,7 @@ func (c *Client) UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error)
 		return nil, errgo.Notef(err, "cannot open bundle archive")
 	}
 	defer r.Close()
-	return c.uploadArchive(id, r, hash, size, -1)
+	return c.UploadArchive(id, r, hash, size, -1)
 }
 
 // UploadBundleWithRevision uploads the given bundle to the
@@ -747,15 +747,20 @@ func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulg
 		return errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	_, err = c.uploadArchive(id, r, hash, size, promulgatedRevision)
+	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision)
 	return errgo.Mask(err, isAPIError)
 }
 
-// uploadArchive pushes the archive for the charm or bundle represented by
+// UploadArchive pushes the archive for the charm or bundle represented by
 // the given body, its hex-encoded SHA384 hash and its size. It returns
 // the resulting entity reference. The given id should include the series
-// and should not include the revision.
-func (c *Client) uploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
+// should usually include the revision, unless a specific revision is required
+// (for example when synchronizing between charmstores). If a revision
+// is specified, then PUT will be used instead of POST.
+//
+// This is the method used internally by UploadBundle, UploadCharm and UploadCharmWithRevision;
+// one of those methods should usually be used in preference.
+func (c *Client) UploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
 	// When uploading archives, it can be a problem that the
 	// an error response is returned while we are still writing
 	// the body data.
