@@ -689,7 +689,7 @@ func (c *Client) UploadCharm(id *charm.URL, ch charm.Charm) (*charm.URL, error) 
 		return nil, errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	return c.UploadArchive(id, r, hash, size, -1)
+	return c.UploadArchive(id, r, hash, size, -1, nil)
 }
 
 // UploadCharmWithRevision uploads the given charm to the
@@ -708,7 +708,7 @@ func (c *Client) UploadCharmWithRevision(id *charm.URL, ch charm.Charm, promulga
 		return errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision)
+	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision, nil)
 	return errgo.Mask(err, isAPIError)
 }
 
@@ -728,7 +728,7 @@ func (c *Client) UploadBundle(id *charm.URL, b charm.Bundle) (*charm.URL, error)
 		return nil, errgo.Notef(err, "cannot open bundle archive")
 	}
 	defer r.Close()
-	return c.UploadArchive(id, r, hash, size, -1)
+	return c.UploadArchive(id, r, hash, size, -1, nil)
 }
 
 // UploadBundleWithRevision uploads the given bundle to the
@@ -747,7 +747,7 @@ func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulg
 		return errgo.Notef(err, "cannot open charm archive")
 	}
 	defer r.Close()
-	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision)
+	_, err = c.UploadArchive(id, r, hash, size, promulgatedRevision, nil)
 	return errgo.Mask(err, isAPIError)
 }
 
@@ -760,7 +760,7 @@ func (c *Client) UploadBundleWithRevision(id *charm.URL, b charm.Bundle, promulg
 //
 // This is the method used internally by UploadBundle, UploadCharm and UploadCharmWithRevision;
 // one of those methods should usually be used in preference.
-func (c *Client) UploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int) (*charm.URL, error) {
+func (c *Client) UploadArchive(id *charm.URL, body io.ReadSeeker, hash string, size int64, promulgatedRevision int, chans []params.Channel) (*charm.URL, error) {
 	// When uploading archives, it can be a problem that the
 	// an error response is returned while we are still writing
 	// the body data.
@@ -778,14 +778,16 @@ func (c *Client) UploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 		}
 	}
 	method := "POST"
-	promulgatedArg := ""
+	urlParams := url.Values{
+		"hash": {hash},
+	}
 	if id.Revision != -1 {
 		method = "PUT"
 		if promulgatedRevision != -1 {
 			pr := *id
 			pr.User = ""
 			pr.Revision = promulgatedRevision
-			promulgatedArg = "&promulgated=" + pr.Path()
+			urlParams.Set("promulgated", pr.Path())
 		}
 	}
 
@@ -796,11 +798,14 @@ func (c *Client) UploadArchive(id *charm.URL, body io.ReadSeeker, hash string, s
 	}
 	req.Header.Set("Content-Type", "application/zip")
 	req.ContentLength = size
+	for _, c := range chans {
+		urlParams["channel"] = append(urlParams["channel"], string(c))
+	}
 
 	// Send the request.
 	resp, err := c.Do(
 		req,
-		"/"+id.Path()+"/archive?hash="+hash+promulgatedArg,
+		"/"+id.Path()+"/archive?"+urlParams.Encode(),
 	)
 	if err != nil {
 		return nil, errgo.NoteMask(err, "cannot post archive", isAPIError)
