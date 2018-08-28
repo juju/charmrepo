@@ -245,6 +245,21 @@ func (c *Client) UploadResource(id *charm.URL, name, path string, file io.Reader
 	return c.ResumeUploadResource("", id, name, path, file, size, progress)
 }
 
+// UploadResourceWithRevision is like UploadResource except that it
+// puts the resource at a known revision, useful when transferring
+// resources between charm store instances.
+func (c *Client) UploadResourceWithRevision(
+	id *charm.URL,
+	name string,
+	rev int,
+	path string,
+	file io.ReaderAt,
+	size int64,
+	progress Progress,
+) (revision int, err error) {
+	return c.ResumeUploadResourceWithRevision("", id, name, rev, path, file, size, progress)
+}
+
 // AddDockerResource adds a reference to a docker image that is available in a docker
 // registry as a resource to the charm with the given id. If imageName is non-empty,
 // it names the image in some non-charmstore-associated registry; otherwise
@@ -301,12 +316,29 @@ var ErrUploadNotFound = errgo.Newf("upload not found")
 // it specifies the id of an existing upload to resume; if an upload with this ID is not
 // found, an error with an ErrUploadNotFound cause is returned.
 func (c *Client) ResumeUploadResource(uploadId string, id *charm.URL, resourceName, path string, content io.ReaderAt, size int64, progress Progress) (revision int, err error) {
+	return c.ResumeUploadResourceWithRevision(uploadId, id, resourceName, -1, path, content, size, progress)
+}
+
+// ResumeUploadResource is like UploadResource except that if uploadId is non-empty,
+// it specifies the id of an existing upload to resume; if an upload with this ID is not
+// found, an error with an ErrUploadNotFound cause is returned.
+func (c *Client) ResumeUploadResourceWithRevision(
+	uploadId string,
+	id *charm.URL,
+	resourceName string,
+	rev int,
+	path string,
+	content io.ReaderAt,
+	size int64,
+	progress Progress,
+) (revision int, err error) {
 	if progress == nil {
 		progress = noProgress{}
 	}
 	info := &uploadInfo{
 		id:           id,
 		resourceName: resourceName,
+		revision:     rev,
 		path:         path,
 		size:         size,
 		progress:     progress,
@@ -332,9 +364,16 @@ func (c *Client) uploadSinglePartResource(info *uploadInfo) (revision int, err e
 	if err != nil {
 		return 0, errgo.Notef(err, "cannot make new request")
 	}
+	if info.revision != -1 {
+		req.Method = "PUT"
+	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = info.size
-	url := fmt.Sprintf("/%s/resource/%s?hash=%s&filename=%s", info.id.Path(), info.resourceName, url.QueryEscape(hash), url.QueryEscape(info.path))
+	path := fmt.Sprintf("/%s/resource/%s", info.id.Path(), info.resourceName)
+	if info.revision != -1 {
+		path += fmt.Sprintf("/%d", info.revision)
+	}
+	url := fmt.Sprintf("%s?hash=%s&filename=%s", path, url.QueryEscape(hash), url.QueryEscape(info.path))
 	resp, err := c.Do(req, url)
 	if err != nil {
 		return 0, errgo.NoteMask(err, "cannot post resource", isAPIError)
@@ -352,6 +391,7 @@ func (c *Client) uploadSinglePartResource(info *uploadInfo) (revision int, err e
 type uploadInfo struct {
 	id           *charm.URL
 	resourceName string
+	revision     int
 	path         string
 	size         int64
 	progress     Progress
@@ -442,12 +482,18 @@ loop:
 	if err := c.PutWithResponse("/upload/"+info.UploadId, parts, &finishResponse); err != nil {
 		return 0, errgo.Mask(err)
 	}
-	url := fmt.Sprintf("/%s/resource/%s?upload-id=%s&filename=%s", info.id.Path(), info.resourceName, info.UploadId, info.path)
+	method := "POST"
+	path := fmt.Sprintf("/%s/resource/%s", info.id.Path(), info.resourceName)
+	if info.revision != -1 {
+		path += fmt.Sprintf("/%d", info.revision)
+		method = "PUT"
+	}
+	url := fmt.Sprintf("%s?upload-id=%s&filename=%s", path, info.UploadId, info.path)
 
 	// The multipart upload has now been uploaded.
 	// Create the resource that uses it.
 	var resourceResp params.ResourceUploadResponse
-	if err := c.DoWithResponse("POST", url, nil, &resourceResp); err != nil {
+	if err := c.DoWithResponse(method, url, nil, &resourceResp); err != nil {
 		return -1, errgo.NoteMask(err, "cannot post resource", isAPIError)
 	}
 	return resourceResp.Revision, nil
