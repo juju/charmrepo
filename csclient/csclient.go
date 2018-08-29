@@ -655,6 +655,7 @@ func (c *Client) Publish(id *charm.URL, channels []params.Channel, resources map
 // It must be closed after use.
 type ResourceData struct {
 	io.ReadCloser
+	Size int64
 	Hash string
 }
 
@@ -695,6 +696,7 @@ func (c *Client) GetResource(id *charm.URL, name string, revision int) (result R
 
 	return ResourceData{
 		ReadCloser: resp.Body,
+		Size:       resp.ContentLength,
 		Hash:       hash,
 	}, nil
 }
