@@ -2547,6 +2547,8 @@ func assertGetResource(c *gc.C, client *csclient.Client, url *charm.URL, resourc
 	c.Assert(err, jc.ErrorIsNil)
 	defer getResult.Close()
 
+	c.Check(getResult.Size, gc.Equals, int64(len(expectData)))
+
 	gotData, err := ioutil.ReadAll(getResult)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(string(gotData), gc.Equals, expectData)
