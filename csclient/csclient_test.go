@@ -1700,6 +1700,28 @@ func (s *suite) TestUploadResource(c *gc.C) {
 	}
 }
 
+func (s *suite) TestUploadEmptyResource(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo.zip",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	// Upload the resource.
+	data := ""
+	rev, err := s.client.UploadResource(url, "resname", "data.zip", strings.NewReader(data), int64(len(data)), nil)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 0)
+
+	// Check that we can download it OK.
+	assertGetResource(c, s.client, url, "resname", 0, data)
+}
+
 func (s *suite) TestUploadResourceWithRevision(c *gc.C) {
 	ch := charmtesting.NewCharmMeta(&charm.Meta{
 		Resources: map[string]resource.Meta{
@@ -1714,6 +1736,28 @@ func (s *suite) TestUploadResourceWithRevision(c *gc.C) {
 
 	// Upload the resource.
 	data := "boo!"
+	rev, err := s.client.UploadResourceWithRevision(url, "resname", 13, "data.zip", strings.NewReader(data), int64(len(data)), nil)
+	c.Assert(err, jc.ErrorIsNil)
+	c.Assert(rev, gc.Equals, 13)
+
+	// Check that we can download it OK.
+	assertGetResource(c, s.client, url, "resname", 13, data)
+}
+
+func (s *suite) TestUploadEmptyResourceWithRevision(c *gc.C) {
+	ch := charmtesting.NewCharmMeta(&charm.Meta{
+		Resources: map[string]resource.Meta{
+			"resname": {
+				Name: "resname",
+				Path: "foo.zip",
+			},
+		},
+	})
+	url, err := s.client.UploadCharm(charm.MustParseURL("cs:~who/trusty/mysql"), ch)
+	c.Assert(err, gc.IsNil)
+
+	// Upload the resource.
+	data := ""
 	rev, err := s.client.UploadResourceWithRevision(url, "resname", 13, "data.zip", strings.NewReader(data), int64(len(data)), nil)
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(rev, gc.Equals, 13)

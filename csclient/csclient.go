@@ -369,6 +369,11 @@ func (c *Client) uploadSinglePartResource(info *uploadInfo) (revision int, err e
 	}
 	req.Header.Set("Content-Type", "application/octet-stream")
 	req.ContentLength = info.size
+	if info.size == 0 {
+		// Setting body to nil is the only way to make sure that
+		// an explicit 0 Content-Length header is set.
+		req.Body = nil
+	}
 	path := fmt.Sprintf("/%s/resource/%s", info.id.Path(), info.resourceName)
 	if info.revision != -1 {
 		path += fmt.Sprintf("/%d", info.revision)
