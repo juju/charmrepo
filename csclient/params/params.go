@@ -255,6 +255,12 @@ type IdResponse struct {
 	Revision int
 }
 
+// AllPermsResponse holds the resource of an id/allperms GET
+// request.
+type AllPermsResponse struct {
+	Perms map[Channel]PermResponse
+}
+
 // PermResponse holds the result of an id/meta/perm GET request.
 // See https://github.com/juju/charmstore/blob/v5-unstable/docs/API.md#get-idmetaperm
 type PermResponse struct {
