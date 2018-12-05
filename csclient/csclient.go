@@ -304,7 +304,7 @@ func (c *Client) DockerResourceDownloadInfo(id *charm.URL, resourceName string, 
 func (c *Client) DockerResourceUploadInfo(id *charm.URL, resourceName string) (*params.DockerInfoResponse, error) {
 	path := fmt.Sprintf("/%s/docker-resource-upload-info?resource-name=%s", id.Path(), url.QueryEscape(resourceName))
 	var result params.DockerInfoResponse
-	if err := c.DoWithResponse("GET", path, nil, &result); err != nil {
+	if err := c.Get(path, &result); err != nil {
 		return nil, errgo.Mask(err)
 	}
 	return &result, nil
@@ -418,7 +418,7 @@ func (c *Client) uploadMultipartResource(uploadId string, info *uploadInfo) (int
 			return 0, errgo.Mask(err)
 		}
 	} else {
-		if err := c.DoWithResponse("GET", "/upload/"+uploadId, nil, &info.UploadInfoResponse); err != nil {
+		if err := c.Get("/upload/"+uploadId, &info.UploadInfoResponse); err != nil {
 			if errgo.Cause(err) == params.ErrNotFound {
 				return 0, errgo.WithCausef(nil, ErrUploadNotFound, "")
 			}
