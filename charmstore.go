@@ -153,11 +153,18 @@ func (s *CharmStore) Resolve(ref *charm.URL) (*charm.URL, []string, error) {
 // ResolveWithChannel does the same thing as Resolve() but also returns
 // the best channel to use.
 func (s *CharmStore) ResolveWithChannel(ref *charm.URL) (*charm.URL, params.Channel, []string, error) {
+	return s.ResolveWithPreferredChannel(ref, s.client.Channel())
+}
+
+// ResolveWithPreferredChannel does the same thing as ResolveWithChannel() but
+// allows callers to specify a preferred channel to use.
+func (s *CharmStore) ResolveWithPreferredChannel(ref *charm.URL, channel params.Channel) (*charm.URL, params.Channel, []string, error) {
 	var result struct {
 		Id              params.IdResponse
 		SupportedSeries params.SupportedSeriesResponse
 		Published       params.PublishedResponse
 	}
+
 	if _, err := s.client.Meta(ref, &result); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
@@ -172,11 +179,23 @@ func (s *CharmStore) ResolveWithChannel(ref *charm.URL) (*charm.URL, params.Chan
 		}
 		return nil, params.NoChannel, nil, errgo.NoteMask(err, fmt.Sprintf("cannot resolve charm URL %q", ref), errgo.Any)
 	}
+
+	// If no preferredChannel is specified then we should use the (optional)
+	// csclient channel value as our preferredChannel.
+	if channel == params.NoChannel {
+		channel = s.client.Channel()
+	}
+
+	// Validate requested channel.
+	if _, isValid := params.ValidChannels[channel]; !isValid && channel != params.NoChannel {
+		return nil, params.NoChannel, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %q is not a valid channel", ref, channel)
+	}
+
 	// TODO(ericsnow) Get this directly from the API. It has high risk
 	// of getting stale. Perhaps add params.PublishedResponse.BestChannel
 	// or, less desireably, have params.PublishedResponse.Info be
 	// priority-ordered.
-	channel := bestChannel(s.client, result.Published.Info)
+	channel = bestChannel(s.client, result.Published.Info, channel)
 	return result.Id.Id, channel, result.SupportedSeries.SupportedSeries, nil
 }
 
@@ -185,10 +204,9 @@ func (s *CharmStore) ResolveWithChannel(ref *charm.URL) (*charm.URL, params.Chan
 //
 // Note that this is equivalent to code on the server side.
 // See ReqHandler.entityChannel in internal/v5/auth.go.
-func bestChannel(client *csclient.Client, published []params.PublishedInfo) params.Channel {
-	explicitChannel := client.Channel()
-	if explicitChannel != params.NoChannel {
-		return explicitChannel
+func bestChannel(client *csclient.Client, published []params.PublishedInfo, preferredChannel params.Channel) params.Channel {
+	if preferredChannel != params.NoChannel {
+		return preferredChannel
 	}
 	if len(published) == 0 {
 		return params.UnpublishedChannel

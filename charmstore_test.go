@@ -424,62 +424,62 @@ func (s *charmStoreRepoSuite) TestResolveWithChannelEquivalentToResolve(c *gc.C)
 	}
 }
 
-func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
-	tests := []struct {
-		clientChannel params.Channel
-		published     []params.Channel
-		expected      params.Channel
-	}{{
-		clientChannel: params.StableChannel,
-		expected:      params.StableChannel,
-	}, {
-		clientChannel: params.EdgeChannel,
-		expected:      params.EdgeChannel,
-	}, {
-		clientChannel: params.UnpublishedChannel,
-		expected:      params.UnpublishedChannel,
-	}, {
-		clientChannel: params.NoChannel,
-		expected:      params.UnpublishedChannel,
-	}, {
-		published: []params.Channel{params.StableChannel},
-		expected:  params.StableChannel,
-	}, {
-		published: []params.Channel{params.EdgeChannel},
-		expected:  params.EdgeChannel,
-	}, {
-		published: []params.Channel{params.StableChannel, params.EdgeChannel},
-		expected:  params.StableChannel,
-	}, {
-		published: []params.Channel{params.EdgeChannel, params.StableChannel},
-		expected:  params.StableChannel,
-	}, {
-		published: []params.Channel{params.EdgeChannel, params.BetaChannel, params.CandidateChannel},
-		expected:  params.CandidateChannel,
-	}, {
-		clientChannel: params.StableChannel,
-		published:     []params.Channel{params.EdgeChannel, params.StableChannel},
-		expected:      params.StableChannel,
-	}, {
-		clientChannel: params.EdgeChannel,
-		published:     []params.Channel{params.StableChannel, params.EdgeChannel},
-		expected:      params.EdgeChannel,
-	}, {
-		clientChannel: params.UnpublishedChannel,
-		published:     []params.Channel{params.StableChannel},
-		expected:      params.UnpublishedChannel,
-	}, {
-		clientChannel: params.CandidateChannel,
-		published:     []params.Channel{params.EdgeChannel, params.CandidateChannel, params.StableChannel},
-		expected:      params.CandidateChannel,
-	}, {
-		expected: params.UnpublishedChannel,
-	}}
+var channelResolveTests = []struct {
+	clientChannel params.Channel
+	published     []params.Channel
+	expected      params.Channel
+}{{
+	clientChannel: params.StableChannel,
+	expected:      params.StableChannel,
+}, {
+	clientChannel: params.EdgeChannel,
+	expected:      params.EdgeChannel,
+}, {
+	clientChannel: params.UnpublishedChannel,
+	expected:      params.UnpublishedChannel,
+}, {
+	clientChannel: params.NoChannel,
+	expected:      params.UnpublishedChannel,
+}, {
+	published: []params.Channel{params.StableChannel},
+	expected:  params.StableChannel,
+}, {
+	published: []params.Channel{params.EdgeChannel},
+	expected:  params.EdgeChannel,
+}, {
+	published: []params.Channel{params.StableChannel, params.EdgeChannel},
+	expected:  params.StableChannel,
+}, {
+	published: []params.Channel{params.EdgeChannel, params.StableChannel},
+	expected:  params.StableChannel,
+}, {
+	published: []params.Channel{params.EdgeChannel, params.BetaChannel, params.CandidateChannel},
+	expected:  params.CandidateChannel,
+}, {
+	clientChannel: params.StableChannel,
+	published:     []params.Channel{params.EdgeChannel, params.StableChannel},
+	expected:      params.StableChannel,
+}, {
+	clientChannel: params.EdgeChannel,
+	published:     []params.Channel{params.StableChannel, params.EdgeChannel},
+	expected:      params.EdgeChannel,
+}, {
+	clientChannel: params.UnpublishedChannel,
+	published:     []params.Channel{params.StableChannel},
+	expected:      params.UnpublishedChannel,
+}, {
+	clientChannel: params.CandidateChannel,
+	published:     []params.Channel{params.EdgeChannel, params.CandidateChannel, params.StableChannel},
+	expected:      params.CandidateChannel,
+}, {
+	expected: params.UnpublishedChannel,
+}}
 
+func (s *charmStoreRepoSuite) TestResolveWithGloballyForcedChannel(c *gc.C) {
 	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
 	cURL := charm.MustParseURL("~who/trusty/mysql")
 
-	for i, test := range tests {
+	for i, test := range channelResolveTests {
 		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)
 
 		cURL.Revision = i
@@ -494,6 +494,33 @@ func (s *charmStoreRepoSuite) TestResolveWithChannel(c *gc.C) {
 		repo := charmrepo.NewCharmStoreFromClient(s.client.WithChannel(test.clientChannel))
 
 		_, channel, _, err := repo.ResolveWithChannel(cURL)
+		c.Assert(err, jc.ErrorIsNil)
+
+		c.Check(channel, gc.Equals, test.expected)
+	}
+}
+
+func (s *charmStoreRepoSuite) TestResolveWithPreferredChannel(c *gc.C) {
+	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
+	cURL := charm.MustParseURL("~who/trusty/mysql")
+
+	for i, test := range channelResolveTests {
+		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)
+
+		cURL.Revision = i
+		err := s.client.UploadCharmWithRevision(cURL, ch, cURL.Revision)
+		c.Assert(err, gc.IsNil)
+		s.setPublic(c, cURL)
+		if len(test.published) > 0 {
+			s.setPublic(c, cURL, test.published...)
+		} else if test.clientChannel != params.NoChannel && test.clientChannel != params.UnpublishedChannel {
+			s.setPublic(c, cURL, test.clientChannel)
+		}
+
+		// Instead of forcing a particular channel to the client, pass
+		// it as the preferred channel to the URL resolver.
+		repo := charmrepo.NewCharmStoreFromClient(s.client)
+		_, channel, _, err := repo.ResolveWithPreferredChannel(cURL, test.clientChannel)
 		c.Assert(err, jc.ErrorIsNil)
 
 		c.Check(channel, gc.Equals, test.expected)
