@@ -165,7 +165,7 @@ func (s *CharmStore) ResolveWithPreferredChannel(ref *charm.URL, channel params.
 		Published       params.PublishedResponse
 	}
 
-	if _, err := s.client.Meta(ref, &result); err != nil {
+	if _, err := s.client.MetaWithChannel(ref, &result, channel); err != nil {
 		if errgo.Cause(err) == params.ErrNotFound {
 			// Make a prettier error message for the user.
 			etype := "charm"
