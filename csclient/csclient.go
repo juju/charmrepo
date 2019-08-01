@@ -802,6 +802,13 @@ func (c *Client) PutCommonInfo(id *charm.URL, info map[string]interface{}) error
 //	}
 //	id, err := client.Meta(id, &result)
 func (c *Client) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
+	return c.MetaWithChannel(id, result, c.channel)
+}
+
+// MetaWithChannel behaves the same as a call to Meta but allows the caller to
+// specify a channel which will be passed to the metadata endpoint only for
+// this particular lookup.
+func (c *Client) MetaWithChannel(id *charm.URL, result interface{}, channel params.Channel) (*charm.URL, error) {
 	if result == nil {
 		return nil, fmt.Errorf("expected valid result pointer, not nil")
 	}
@@ -821,6 +828,11 @@ func (c *Client) Meta(id *charm.URL, result interface{}) (*charm.URL, error) {
 
 	numField := resultt.NumField()
 	includes := make([]string, 0, numField)
+
+	// If a channel override is specified add it to the query parameters.
+	if channel != params.NoChannel {
+		includes = append(includes, "channel="+string(channel))
+	}
 
 	// results holds an entry for each field in the result value,
 	// pointing to the value for that field.
