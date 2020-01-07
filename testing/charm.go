@@ -41,21 +41,6 @@ func NewRepo(path, defaultSeries string) *Repo {
 	return r
 }
 
-// NewRepoFromFullPath returns a new testing charm repository rooted at the given full
-// path, and not relative to the package directory, using
-// defaultSeries as the default series.
-func NewRepoFromFullPath(path, defaultSeries string) *Repo {
-	r := &Repo{
-		path:          path,
-		defaultSeries: defaultSeries,
-	}
-	_, err := os.Stat(r.path)
-	if err != nil {
-		panic(fmt.Errorf("cannot read repository found at %q: %v", r.path, err))
-	}
-	return r
-}
-
 // Repo represents a charm repository used for testing.
 type Repo struct {
 	path          string
