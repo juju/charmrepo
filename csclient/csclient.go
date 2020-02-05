@@ -36,6 +36,11 @@ import (
 	"gopkg.in/juju/charmrepo.v4/csclient/params"
 )
 
+const (
+	userAgentKey   = "User-Agent"
+	userAgentValue = "Golang_CSClient/4.0"
+)
+
 const apiVersion = "v5"
 
 const defaultMinMultipartUploadSize = 5 * 1024 * 1024
@@ -1119,6 +1124,12 @@ func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
 	for k, vv := range c.header {
 		req.Header[k] = append(req.Header[k], vv...)
 	}
+
+	// Set the user-agent if one isn't supplied
+	if userAgent := req.Header.Get(userAgentKey); userAgent == "" {
+		req.Header.Set(userAgentKey, userAgentValue)
+	}
+
 	u, err := url.Parse(c.params.URL + "/" + apiVersion + path)
 	if err != nil {
 		return nil, errgo.Mask(err)
