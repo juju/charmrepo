@@ -186,11 +186,6 @@ func (s *CharmStore) ResolveWithPreferredChannel(ref *charm.URL, channel params.
 		channel = s.client.Channel()
 	}
 
-	// Validate requested channel.
-	if _, isValid := params.ValidChannels[channel]; !isValid && channel != params.NoChannel {
-		return nil, params.NoChannel, nil, errgo.WithCausef(nil, params.ErrNotFound, "cannot resolve URL %q: %q is not a valid channel", ref, channel)
-	}
-
 	// TODO(ericsnow) Get this directly from the API. It has high risk
 	// of getting stale. Perhaps add params.PublishedResponse.BestChannel
 	// or, less desireably, have params.PublishedResponse.Info be
