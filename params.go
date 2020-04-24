@@ -1,13 +1,13 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v4"
+package charmrepo // import "github.com/juju/charmrepo/v5"
 
 import (
 	"fmt"
 
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charm.v6/resource"
+	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v7/resource"
 )
 
 // InfoResponse is sent by the charm store in response to charm-info requests.

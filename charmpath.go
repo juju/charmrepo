@@ -1,15 +1,15 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v4"
+package charmrepo // import "github.com/juju/charmrepo/v5"
 
 import (
 	"os"
 	"path/filepath"
 	"strings"
 
+	"github.com/juju/charm/v7"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
 )
 
 func isNotExistsError(err error) bool {

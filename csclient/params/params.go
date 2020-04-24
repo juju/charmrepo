@@ -4,14 +4,14 @@
 // The params package holds types that are a part of the charm store's external
 // contract - they will be marshalled (or unmarshalled) as JSON
 // and delivered through the HTTP API.
-package params // import "gopkg.in/juju/charmrepo.v4/csclient/params"
+package params // import "github.com/juju/charmrepo/v5/csclient/params"
 
 import (
 	"encoding/json"
 	"time"
 
+	"github.com/juju/charm/v7"
 	"github.com/juju/utils/debugstatus"
-	"gopkg.in/juju/charm.v6"
 	"gopkg.in/macaroon.v2"
 )
 

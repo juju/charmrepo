@@ -10,7 +10,7 @@
 // denied, an error with a cause satisfying IsAuthorizationError will be
 // returned. Note that these errors can also include errors returned by
 // httpbakery when it attempts to discharge macaroons.
-package csclient // import "gopkg.in/juju/charmrepo.v4/csclient"
+package csclient // import "github.com/juju/charmrepo/v5/csclient"
 
 import (
 	"bytes"
@@ -28,12 +28,12 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/juju/charm/v7"
 	"gopkg.in/errgo.v1"
 	httprequest "gopkg.in/httprequest.v1"
-	"gopkg.in/juju/charm.v6"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"gopkg.in/juju/charmrepo.v4/csclient/params"
+	"github.com/juju/charmrepo/v5/csclient/params"
 )
 
 const (

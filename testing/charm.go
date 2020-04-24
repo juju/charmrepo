@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package testing // import "gopkg.in/juju/charmrepo.v4/testing"
+package testing // import "github.com/juju/charmrepo/v5/testing"
 
 import (
 	"fmt"
@@ -9,8 +9,8 @@ import (
 	"path/filepath"
 	"runtime"
 
+	"github.com/juju/charm/v7"
 	"github.com/juju/utils/fs"
-	"gopkg.in/juju/charm.v6"
 )
 
 func check(err error) {

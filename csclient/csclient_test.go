@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient_test // import "gopkg.in/juju/charmrepo.v4/csclient"
+package csclient_test // import "github.com/juju/charmrepo/v5/csclient"
 
 import (
 	"bytes"
@@ -22,14 +22,14 @@ import (
 	"sync"
 	"time"
 
+	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v7/resource"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/utils"
 	"golang.org/x/net/context"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/juju/charm.v6"
-	"gopkg.in/juju/charm.v6/resource"
 	"gopkg.in/juju/charmstore.v5"
 	"gopkg.in/juju/idmclient.v1/idmtest"
 	httpbakery2u "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
@@ -39,9 +39,9 @@ import (
 	"gopkg.in/macaroon.v2"
 	"gopkg.in/mgo.v2"
 
-	"gopkg.in/juju/charmrepo.v4/csclient"
-	"gopkg.in/juju/charmrepo.v4/csclient/params"
-	charmtesting "gopkg.in/juju/charmrepo.v4/testing"
+	"github.com/juju/charmrepo/v5/csclient"
+	"github.com/juju/charmrepo/v5/csclient/params"
+	charmtesting "github.com/juju/charmrepo/v5/testing"
 )
 
 var charmRepo = charmtesting.NewRepo("../internal/test-charm-repo", "quantal")

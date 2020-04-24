@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient_test // import "gopkg.in/juju/charmrepo.v4/csclient"
+package csclient_test // import "github.com/juju/charmrepo/v5/csclient"
 
 import (
 	"testing"

@@ -3,11 +3,11 @@
 
 // Package charmrepo implements access to charm repositories.
 
-package charmrepo // import "gopkg.in/juju/charmrepo.v4"
+package charmrepo // import "github.com/juju/charmrepo/v5"
 
 import (
+	"github.com/juju/charm/v7"
 	"github.com/juju/loggo"
-	"gopkg.in/juju/charm.v6"
 )
 
 var logger = loggo.GetLogger("juju.charm.charmrepo")
