@@ -9,11 +9,12 @@ import (
 	"strings"
 
 	"github.com/juju/charm/v7"
+	"github.com/juju/errors"
 	"gopkg.in/errgo.v1"
 )
 
 func isNotExistsError(err error) bool {
-	if os.IsNotExist(err) {
+	if os.IsNotExist(errors.Cause(err)) {
 		return true
 	}
 	// On Windows, we get a path error due to a GetFileAttributesEx syscall.
