@@ -3,7 +3,7 @@
 
 // Package charmrepo implements access to charm repositories.
 
-package charmrepo // import "github.com/juju/charmrepo/v5"
+package charmrepo // import "github.com/juju/charmrepo/v6"
 
 import (
 	"github.com/juju/charm/v8"

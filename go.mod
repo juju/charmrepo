@@ -1,4 +1,4 @@
-module github.com/juju/charmrepo/v5
+module github.com/juju/charmrepo/v6
 
 go 1.14
 
