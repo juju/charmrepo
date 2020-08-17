@@ -15,7 +15,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	jujutesting "github.com/juju/testing"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"

@@ -10,7 +10,7 @@ import (
 	"os"
 	"sort"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 

@@ -9,7 +9,7 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 

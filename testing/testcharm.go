@@ -13,8 +13,8 @@ import (
 	"strings"
 	"sync"
 
-	"github.com/juju/charm/v7"
-	"github.com/juju/charm/v7/resource"
+	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v8/resource"
 	"github.com/juju/testing/filetesting"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/errgo.v1"

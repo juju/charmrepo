@@ -8,7 +8,7 @@ package charmrepo // import "github.com/juju/charmrepo/v5"
 import (
 	"net/http"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	"gopkg.in/errgo.v1"
 
 	"github.com/juju/charmrepo/v5/csclient"

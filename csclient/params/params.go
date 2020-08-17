@@ -10,7 +10,7 @@ import (
 	"encoding/json"
 	"time"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	"github.com/juju/utils/debugstatus"
 	"gopkg.in/macaroon.v2"
 )
