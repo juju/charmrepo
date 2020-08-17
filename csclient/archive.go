@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package csclient // import "github.com/juju/charmrepo/v5/csclient"
+package csclient // import "github.com/juju/charmrepo/v6/csclient"
 
 import (
 	"crypto/sha512"
@@ -10,7 +10,7 @@ import (
 	"io/ioutil"
 	"os"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	"gopkg.in/errgo.v1"
 )
 

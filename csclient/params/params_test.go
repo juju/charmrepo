@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params_test // import "github.com/juju/charmrepo/v5/csclient/params"
+package params_test // import "github.com/juju/charmrepo/v6/csclient/params"
 
 import (
 	"encoding/json"
@@ -11,7 +11,7 @@ import (
 	gc "gopkg.in/check.v1"
 	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
-	"github.com/juju/charmrepo/v5/csclient/params"
+	"github.com/juju/charmrepo/v6/csclient/params"
 )
 
 type suite struct{}

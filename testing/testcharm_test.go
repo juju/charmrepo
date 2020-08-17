@@ -1,13 +1,13 @@
-package testing_test // import "github.com/juju/charmrepo/v5/testing"
+package testing_test // import "github.com/juju/charmrepo/v6/testing"
 
 import (
-	"github.com/juju/charm/v7"
-	"github.com/juju/charm/v7/resource"
+	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v8/resource"
 	jc "github.com/juju/testing/checkers"
 	"github.com/juju/testing/filetesting"
 	gc "gopkg.in/check.v1"
 
-	"github.com/juju/charmrepo/v5/testing"
+	"github.com/juju/charmrepo/v6/testing"
 )
 
 var _ = gc.Suite(&testCharmSuite{})

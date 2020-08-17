@@ -1,7 +1,7 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "github.com/juju/charmrepo/v5"
+package charmrepo_test // import "github.com/juju/charmrepo/v6"
 
 import (
 	"net/http"
@@ -9,11 +9,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"github.com/juju/charm/v7"
+	"github.com/juju/charm/v8"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
-	"github.com/juju/charmrepo/v5"
+	"github.com/juju/charmrepo/v6"
 )
 
 func (s *charmStoreSuite) TestURL(c *gc.C) {

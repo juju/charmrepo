@@ -1,10 +1,10 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params // import "github.com/juju/charmrepo/v5/csclient/params"
+package params // import "github.com/juju/charmrepo/v6/csclient/params"
 
 import (
-	"github.com/juju/charm/v7/resource"
+	"github.com/juju/charm/v8/resource"
 	"gopkg.in/errgo.v1"
 )
 
