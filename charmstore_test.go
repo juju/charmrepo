@@ -207,16 +207,16 @@ func (s *charmStoreRepoSuite) TestGet(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetPromulgated(c *gc.C) {
-	expect, url := s.addCharm(c, "trusty/mysql-42", "mysql")
+	expect, url := s.addCharm(c, "cs:trusty/mysql-42", "mysql")
 	ch, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	checkCharm(c, ch, expect)
 }
 
 func (s *charmStoreRepoSuite) TestGetRevisions(c *gc.C) {
-	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
-	expect1, url1 := s.addCharm(c, "~dalek/trusty/riak-1", "riak")
-	expect2, _ := s.addCharm(c, "~dalek/trusty/riak-2", "riak")
+	s.addCharm(c, "cs:~dalek/trusty/riak-0", "riak")
+	expect1, url1 := s.addCharm(c, "cs:~dalek/trusty/riak-1", "riak")
+	expect2, _ := s.addCharm(c, "cs:~dalek/trusty/riak-2", "riak")
 
 	// Retrieve an old revision.
 	ch, err := s.repo.Get(url1, filepath.Join(c.MkDir(), "charm"))
@@ -230,7 +230,7 @@ func (s *charmStoreRepoSuite) TestGetRevisions(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetCache(c *gc.C) {
-	_, url := s.addCharm(c, "~who/trusty/mysql-42", "mysql")
+	_, url := s.addCharm(c, "cs:~who/trusty/mysql-42", "mysql")
 	ch, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
 	c.Assert(err, jc.ErrorIsNil)
 	c.Assert(hashOfPath(c, ch.Path), gc.Equals, hashOfCharm(c, "mysql"))
@@ -240,7 +240,7 @@ func (s *charmStoreRepoSuite) TestGetIncreaseStats(c *gc.C) {
 	if jujutesting.MgoServer.WithoutV8 {
 		c.Skip("mongo javascript not enabled")
 	}
-	_, url := s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
+	_, url := s.addCharm(c, "cs:~who/precise/wordpress-2", "wordpress")
 
 	// Retrieve the charm.
 	_, err := s.repo.Get(url, filepath.Join(c.MkDir(), "charm"))
@@ -286,7 +286,7 @@ func (s *charmStoreRepoSuite) TestGetErrorServer(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetErrorHashMismatch(c *gc.C) {
-	_, url := s.addCharm(c, "trusty/riak-0", "riak")
+	_, url := s.addCharm(c, "cs:trusty/riak-0", "riak")
 
 	// Set up a proxy server that modifies the returned hash.
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -331,60 +331,60 @@ var resolveTests = []struct {
 	supportedSeries []string
 	err             string
 }{{
-	id:              "~who/mysql",
+	id:              "cs:~who/mysql",
 	url:             "cs:~who/trusty/mysql-0",
 	supportedSeries: []string{"trusty"},
 }, {
-	id:              "~who/trusty/mysql",
+	id:              "cs:~who/trusty/mysql",
 	url:             "cs:~who/trusty/mysql-0",
 	supportedSeries: []string{"trusty"},
 }, {
-	id:              "~who/wordpress",
+	id:              "cs:~who/wordpress",
 	url:             "cs:~who/precise/wordpress-2",
 	supportedSeries: []string{"precise"},
 }, {
-	id:  "~who/wordpress-2",
+	id:  "cs:~who/wordpress-2",
 	err: `cannot resolve URL "cs:~who/wordpress-2": charm or bundle not found`,
 }, {
-	id:              "~dalek/riak",
+	id:              "cs:~dalek/riak",
 	url:             "cs:~dalek/utopic/riak-42",
 	supportedSeries: []string{"utopic"},
 }, {
-	id:              "~dalek/utopic/riak-42",
+	id:              "cs:~dalek/utopic/riak-42",
 	url:             "cs:~dalek/utopic/riak-42",
 	supportedSeries: []string{"utopic"},
 }, {
-	id:              "utopic/mysql",
+	id:              "cs:utopic/mysql",
 	url:             "cs:utopic/mysql-47",
 	supportedSeries: []string{"utopic"},
 }, {
-	id:              "utopic/mysql-47",
+	id:              "cs:utopic/mysql-47",
 	url:             "cs:utopic/mysql-47",
 	supportedSeries: []string{"utopic"},
 }, {
-	id:              "~who/multi-series",
+	id:              "cs:~who/multi-series",
 	url:             "cs:~who/multi-series-0",
 	supportedSeries: []string{"trusty", "precise", "quantal"},
 }, {
-	id:  "~dalek/utopic/riak-100",
+	id:  "cs:~dalek/utopic/riak-100",
 	err: `cannot resolve URL "cs:~dalek/utopic/riak-100": charm not found`,
 }, {
-	id:  "bundle/no-such",
+	id:  "cs:bundle/no-such",
 	err: `cannot resolve URL "cs:bundle/no-such": bundle not found`,
 }, {
-	id:  "no-such",
+	id:  "cs:no-such",
 	err: `cannot resolve URL "cs:no-such": charm or bundle not found`,
 }}
 
 func (s *charmStoreRepoSuite) addResolveTestsCharms(c *gc.C) {
 	// Add promulgated entities first so that the base entity
 	// is marked as promulgated when it first gets inserted.
-	s.addCharm(c, "utopic/mysql-47", "mysql")
-	s.addCharmNoRevision(c, "multi-series", "multi-series")
+	s.addCharm(c, "cs:utopic/mysql-47", "mysql")
+	s.addCharmNoRevision(c, "cs:multi-series", "multi-series")
 
-	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
-	s.addCharm(c, "~who/precise/wordpress-2", "wordpress")
-	s.addCharm(c, "~dalek/utopic/riak-42", "riak")
+	s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
+	s.addCharm(c, "cs:~who/precise/wordpress-2", "wordpress")
+	s.addCharm(c, "cs:~dalek/utopic/riak-42", "riak")
 }
 
 func (s *charmStoreRepoSuite) TestResolve(c *gc.C) {
@@ -477,7 +477,7 @@ var channelResolveTests = []struct {
 
 func (s *charmStoreRepoSuite) TestResolveWithGloballyForcedChannel(c *gc.C) {
 	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
-	cURL := charm.MustParseURL("~who/trusty/mysql")
+	cURL := charm.MustParseURL("cs:~who/trusty/mysql")
 
 	for i, test := range channelResolveTests {
 		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)
@@ -502,7 +502,7 @@ func (s *charmStoreRepoSuite) TestResolveWithGloballyForcedChannel(c *gc.C) {
 
 func (s *charmStoreRepoSuite) TestResolveWithPreferredChannel(c *gc.C) {
 	ch := TestCharms.CharmArchive(c.MkDir(), "mysql")
-	cURL := charm.MustParseURL("~who/trusty/mysql")
+	cURL := charm.MustParseURL("cs:~who/trusty/mysql")
 
 	for i, test := range channelResolveTests {
 		c.Logf("test %d: %s/%v", i, test.clientChannel, test.published)

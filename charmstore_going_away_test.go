@@ -25,12 +25,12 @@ func (s *charmStoreSuite) TestURL(c *gc.C) {
 
 func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 	// Add some charms to the charm store.
-	s.addCharm(c, "~who/trusty/mysql-0", "mysql")
-	s.addCharm(c, "~who/precise/wordpress-1", "wordpress")
-	s.addCharm(c, "~dalek/trusty/riak-0", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-1", "riak")
-	s.addCharm(c, "~dalek/trusty/riak-3", "riak")
-	_, url := s.addCharm(c, "~who/utopic/varnish-0", "varnish")
+	s.addCharm(c, "cs:~who/trusty/mysql-0", "mysql")
+	s.addCharm(c, "cs:~who/precise/wordpress-1", "wordpress")
+	s.addCharm(c, "cs:~dalek/trusty/riak-0", "riak")
+	s.addCharm(c, "cs:~dalek/trusty/riak-1", "riak")
+	s.addCharm(c, "cs:~dalek/trusty/riak-3", "riak")
+	_, url := s.addCharm(c, "cs:~who/utopic/varnish-0", "varnish")
 
 	// Change permissions on one of the charms so that it is not readable by
 	// anyone.
@@ -104,7 +104,7 @@ func (s *charmStoreRepoSuite) TestLatest(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetWithTestMode(c *gc.C) {
-	_, url := s.addCharm(c, "~who/precise/wordpress-42", "wordpress")
+	_, url := s.addCharm(c, "cs:~who/precise/wordpress-42", "wordpress")
 
 	// Use a repo with test mode enabled to download a charm a couple of
 	// times, and check the downloads count is not increased.
@@ -117,7 +117,7 @@ func (s *charmStoreRepoSuite) TestGetWithTestMode(c *gc.C) {
 }
 
 func (s *charmStoreRepoSuite) TestGetWithJujuAttrs(c *gc.C) {
-	_, url := s.addCharm(c, "trusty/riak-0", "riak")
+	_, url := s.addCharm(c, "cs:trusty/riak-0", "riak")
 
 	// Set up a proxy server that stores the request header.
 	var header http.Header
