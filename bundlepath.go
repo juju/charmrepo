@@ -1,13 +1,13 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "github.com/juju/charmrepo/v6"
+package charmrepo // import "github.com/juju/charmrepo/v7"
 
 import (
 	"os"
 	"path/filepath"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	"gopkg.in/errgo.v1"
 )
 
