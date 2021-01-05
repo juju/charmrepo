@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params // import "github.com/juju/charmrepo/v6/csclient/params"
+package params // import "github.com/juju/charmrepo/v7/csclient/params"
 
 // Define the kinds to be included in stats keys.
 const (

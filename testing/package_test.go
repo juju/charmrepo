@@ -1,4 +1,4 @@
-package testing_test // import "github.com/juju/charmrepo/v6/testing"
+package testing_test // import "github.com/juju/charmrepo/v7/testing"
 
 import (
 	"testing"

@@ -1,7 +1,7 @@
 // Copyright 2014 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package params_test // import "github.com/juju/charmrepo/v6/csclient/params"
+package params_test // import "github.com/juju/charmrepo/v7/csclient/params"
 
 import (
 	"testing"

@@ -1,9 +1,9 @@
-module github.com/juju/charmrepo/v6
+module github.com/juju/charmrepo/v7
 
 go 1.14
 
 require (
-	github.com/juju/charm/v8 v8.0.0-20201117030444-62c13a9fe0f0
+	github.com/juju/charm/v9 v9.0.0-20210105084816-5204c3802611
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/os v0.0.0-20191022170002-da411304426c // indirect

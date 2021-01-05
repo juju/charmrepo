@@ -1,19 +1,19 @@
 // Copyright 2015 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo_test // import "github.com/juju/charmrepo/v6"
+package charmrepo_test // import "github.com/juju/charmrepo/v7"
 
 import (
 	"io/ioutil"
 	"os"
 	"path/filepath"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 	"gopkg.in/yaml.v2"
 
-	"github.com/juju/charmrepo/v6"
+	"github.com/juju/charmrepo/v7"
 )
 
 type bundlePathSuite struct {

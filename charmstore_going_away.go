@@ -1,18 +1,18 @@
 // Copyright 2016 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package charmrepo // import "github.com/juju/charmrepo/v6"
+package charmrepo // import "github.com/juju/charmrepo/v7"
 
 // This file may go away once Juju stops using anything here.
 
 import (
 	"net/http"
 
-	"github.com/juju/charm/v8"
+	"github.com/juju/charm/v9"
 	"gopkg.in/errgo.v1"
 
-	"github.com/juju/charmrepo/v6/csclient"
-	"github.com/juju/charmrepo/v6/csclient/params"
+	"github.com/juju/charmrepo/v7/csclient"
+	"github.com/juju/charmrepo/v7/csclient/params"
 )
 
 // CharmRevision holds the revision number of a charm and any error
