@@ -106,7 +106,7 @@ func newCharm(spec CharmSpec) *Charm {
 		})
 	}
 	if spec.Actions != "" {
-		ch.actions, err = charm.ReadActionsYaml(strings.NewReader(spec.Actions))
+		ch.actions, err = charm.ReadActionsYaml(ch.meta.Name, strings.NewReader(spec.Actions))
 		if err != nil {
 			panic(err)
 		}
