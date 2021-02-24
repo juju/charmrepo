@@ -262,7 +262,8 @@ func (s *suite) TestSetUserAgentHTTPHeader(c *gc.C) {
 		c.Assert(err, jc.ErrorIsNil)
 	}
 	client := csclient.New(csclient.Params{
-		URL: srv.URL,
+		URL:            srv.URL,
+		UserAgentValue: "",
 	})
 
 	// Make a first request without custom headers.
@@ -272,6 +273,38 @@ func (s *suite) TestSetUserAgentHTTPHeader(c *gc.C) {
 	sendRequest(client)
 	c.Assert(header, gc.HasLen, defaultHeaderLen)
 	c.Assert(header.Get("User-Agent"), gc.Equals, "Golang_CSClient/4.0")
+
+	// Make a third request without custom headers.
+	client.SetHTTPHeader(nil)
+	sendRequest(client)
+	c.Assert(header, gc.HasLen, defaultHeaderLen)
+}
+
+func (s *suite) TestSetCustomUserAgentHTTPHeader(c *gc.C) {
+	var header http.Header
+	srv := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, req *http.Request) {
+		header = req.Header
+	}))
+	defer srv.Close()
+
+	sendRequest := func(client *csclient.Client) {
+		req, err := http.NewRequest("GET", "", nil)
+		c.Assert(err, jc.ErrorIsNil)
+		_, err = client.Do(req, "/")
+		c.Assert(err, jc.ErrorIsNil)
+	}
+	client := csclient.New(csclient.Params{
+		URL:            srv.URL,
+		UserAgentValue: "AlternativeUserAgentValue",
+	})
+
+	// Make a first request without custom headers.
+	sendRequest(client)
+	defaultHeaderLen := len(header)
+
+	sendRequest(client)
+	c.Assert(header, gc.HasLen, defaultHeaderLen)
+	c.Assert(header.Get("User-Agent"), gc.Equals, "AlternativeUserAgentValue")
 
 	// Make a third request without custom headers.
 	client.SetHTTPHeader(nil)
