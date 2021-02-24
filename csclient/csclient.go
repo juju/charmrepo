@@ -60,6 +60,7 @@ type Client struct {
 	statsDisabled          bool
 	channel                params.Channel
 	minMultipartUploadSize int64
+	userAgentValue         string
 }
 
 // Params holds parameters for creating a new charm store client.
@@ -82,6 +83,9 @@ type Params struct {
 	// requests to the store. This is used in preference to
 	// HTTPClient.
 	BakeryClient *httpbakery.Client
+
+	// UserAgentVersion allows the overriding of the user agent version.
+	UserAgentValue string
 }
 
 type httpClient interface {
@@ -98,10 +102,15 @@ func New(p Params) *Client {
 		bclient = httpbakery.NewClient()
 		bclient.AddInteractor(httpbakery.WebBrowserInteractor{})
 	}
+	uav := p.UserAgentValue
+	if uav == "" {
+		uav = userAgentValue
+	}
 	return &Client{
 		bclient:                bclient,
 		params:                 p,
 		minMultipartUploadSize: defaultMinMultipartUploadSize,
+		userAgentValue:         uav,
 	}
 }
 
@@ -1127,7 +1136,7 @@ func (c *Client) Do(req *http.Request, path string) (*http.Response, error) {
 
 	// Set the user-agent if one isn't supplied
 	if userAgent := req.Header.Get(userAgentKey); userAgent == "" {
-		req.Header.Set(userAgentKey, userAgentValue)
+		req.Header.Set(userAgentKey, c.userAgentValue)
 	}
 
 	u, err := url.Parse(c.params.URL + "/" + apiVersion + path)
