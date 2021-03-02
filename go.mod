@@ -3,6 +3,7 @@ module github.com/juju/charmrepo/v5
 go 1.14
 
 require (
+	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210309064400-d73aa8f92aa2
 	github.com/juju/charm/v7 v7.0.0-20200625165032-ef717232a815
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
@@ -14,9 +15,8 @@ require (
 	gopkg.in/httprequest.v1 v1.2.0
 	gopkg.in/juju/charmstore.v5 v5.7.1
 	gopkg.in/juju/idmclient.v1 v1.0.0-20180320161856-203d20774ce8
-	gopkg.in/macaroon-bakery.v2 v2.2.0 // indirect
+	gopkg.in/macaroon-bakery.v2 v2.3.0 // indirect
 	gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23
-	gopkg.in/macaroon-bakery.v3 v3.0.0-20210305063614-792624751518
 	gopkg.in/macaroon.v2 v2.1.0
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22
 	gopkg.in/yaml.v2 v2.4.0
