@@ -28,10 +28,10 @@ import (
 	"time"
 	"unicode"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v8"
 	"gopkg.in/errgo.v1"
-	httprequest "gopkg.in/httprequest.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
+	"gopkg.in/httprequest.v1"
 
 	"github.com/juju/charmrepo/v6/csclient/params"
 )
