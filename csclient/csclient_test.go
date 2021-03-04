@@ -22,6 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakerytest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v9"
 	"github.com/juju/charm/v9/resource"
 	jujutesting "github.com/juju/testing"
@@ -33,9 +36,6 @@ import (
 	"gopkg.in/juju/charmstore.v5"
 	"gopkg.in/juju/idmclient.v1/idmtest"
 	httpbakery2u "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v2/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v2/bakerytest"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 	"gopkg.in/macaroon.v2"
 	"gopkg.in/mgo.v2"
 
@@ -2183,7 +2183,7 @@ func (s *suite) TestResumeUploadResourceWithDifferentParts(c *gc.C) {
 	expectRev := 0
 	for i, test := range resumeUploadResourceWithDifferentPartsTests {
 		c.Logf("test %d: %v", i, test.about)
-		content := strings.Repeat(string('A'+i), int(test.size))
+		content := strings.Repeat(string('A'+rune(i)), int(test.size))
 		s.client.SetMinMultipartUploadSize(test.minPartSize)
 
 		uploadId := s.createPartialUpload(c, content, test.ranges)

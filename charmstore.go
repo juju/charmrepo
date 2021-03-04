@@ -10,9 +10,9 @@ import (
 	"os"
 	"sort"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v9"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v2/httpbakery"
 
 	"github.com/juju/charmrepo/v7/csclient"
 	"github.com/juju/charmrepo/v7/csclient/params"
