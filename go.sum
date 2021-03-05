@@ -16,8 +16,6 @@ github.com/frankban/quicktest v1.2.2/go.mod h1:Qh/WofXFeiAFII1aEBu529AtJo6Zg2VHs
 github.com/frankban/quicktest v1.7.3 h1:kV0lw0TH1j1hozahVmcpFCsbV5hcS4ZalH+U7UoeTow=
 github.com/frankban/quicktest v1.7.3/go.mod h1:V1d2J5pfxYH6EjBAgSK7YNXcXlTWxUHdE1sVDXkjnig=
 github.com/gabriel-samfira/sys v0.0.0-20150608132119-9ddc60d56b51/go.mod h1:j3qx7fgMceeChTk5ItmRVrWR2ZOTHI9ymSVsxolzC/g=
-github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210302105820-5587392d1f47 h1:M/8qcBNZGVYiFIjascvjnI3ARTq2odwJLBwm7NS5zLY=
-github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20210302105820-5587392d1f47/go.mod h1:TeW7/BpvsFa0RAVufHgK5c0Jp6W0Gz3vcJPVHv2Zk70=
 github.com/gobwas/glob v0.2.3 h1:A4xDbljILXROh+kObIiy5kIaPYD8e96x1tgBhUI5J+Y=
 github.com/gobwas/glob v0.2.3/go.mod h1:d3Ez4x06l9bZtSvzIay5+Yzi0fmZzPgnTbPcKjJAkT8=
 github.com/golang/mock v1.4.3 h1:GV+pQPG/EUUbkh47niozDcADz6go/dUwhVzdUQHIVRw=
@@ -240,6 +238,8 @@ gopkg.in/macaroon-bakery.v2 v2.2.0 h1:tgib3W6Nz8GhYfF83vp0FEZmncj6UE1ubIG7a09flk
 gopkg.in/macaroon-bakery.v2 v2.2.0/go.mod h1:XyHjEinGUBsCK60Qv+bBejOQD/WklvntpSVGja9utaU=
 gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23 h1:S88MgoRPFdaABeKpvhA0IOsNheGcGgPSRp96Fd5vblw=
 gopkg.in/macaroon-bakery.v2-unstable v2.0.0-20160623142747-5a131df02b23/go.mod h1:53bMIZyOgPepp72UGm3VktAilV+WdJdp6EdCx27mNy4=
+gopkg.in/macaroon-bakery.v3 v3.0.0-20210305063614-792624751518 h1:qLRjbGpri2U8gGogeZnPIOpf1r1b0S9P82l7nikvADg=
+gopkg.in/macaroon-bakery.v3 v3.0.0-20210305063614-792624751518/go.mod h1:uJQbAoLFpASAh/KH5pIKqeBdkaPFJNseRCCjSJNSbhk=
 gopkg.in/macaroon.v2 v2.1.0 h1:HZcsjBCzq9t0eBPMKqTN/uSN6JOm78ZJ2INbqcBQOUI=
 gopkg.in/macaroon.v2 v2.1.0/go.mod h1:OUb+TQP/OP0WOerC2Jp/3CwhIKyIa9kQjuc7H24e6/o=
 gopkg.in/macaroon.v2-unstable v2.0.0-20180309131217-66ab28d0d56f h1:8hfmaQW+QZ7wIMQdPiJ2dbTlKvCFv8XLj/ZzkV1XM+g=
