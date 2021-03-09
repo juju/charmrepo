@@ -22,9 +22,9 @@ import (
 	"sync"
 	"time"
 
-	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v3/bakerytest"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakerytest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v8"
 	"github.com/juju/charm/v8/resource"
 	jujutesting "github.com/juju/testing"

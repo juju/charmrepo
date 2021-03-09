@@ -28,7 +28,7 @@ import (
 	"time"
 	"unicode"
 
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v8"
 	"gopkg.in/errgo.v1"
 	"gopkg.in/httprequest.v1"
