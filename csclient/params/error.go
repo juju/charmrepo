@@ -7,8 +7,8 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"gopkg.in/errgo.v1"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 )
 
 // ErrorCode holds the class of an error in machine-readable format.

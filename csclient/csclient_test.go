@@ -22,6 +22,9 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakery/checkers"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/bakerytest"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"github.com/juju/charm/v9"
 	"github.com/juju/charm/v9/resource"
 	jujutesting "github.com/juju/testing"
@@ -33,9 +36,6 @@ import (
 	"gopkg.in/juju/charmstore.v5"
 	"gopkg.in/juju/idmclient.v1/idmtest"
 	httpbakery2u "gopkg.in/macaroon-bakery.v2-unstable/httpbakery"
-	"gopkg.in/macaroon-bakery.v3/bakery/checkers"
-	"gopkg.in/macaroon-bakery.v3/bakerytest"
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
 	"gopkg.in/macaroon.v2"
 	"gopkg.in/mgo.v2"
 
