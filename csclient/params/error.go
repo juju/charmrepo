@@ -7,7 +7,7 @@ import (
 	"fmt"
 	"strings"
 
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	"gopkg.in/errgo.v1"
 )
 

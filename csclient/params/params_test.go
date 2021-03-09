@@ -7,7 +7,7 @@ import (
 	"encoding/json"
 	"net/textproto"
 
-	"gopkg.in/macaroon-bakery.v3/httpbakery"
+	"github.com/go-macaroon-bakery/macaroon-bakery/v3/httpbakery"
 	jc "github.com/juju/testing/checkers"
 	gc "gopkg.in/check.v1"
 
