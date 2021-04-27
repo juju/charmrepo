@@ -1,7 +1,7 @@
 // Copyright 2012, 2013 Canonical Ltd.
 // Licensed under the LGPLv3, see LICENCE file for details.
 
-package testing // import "github.com/juju/charmrepo/v7/testing"
+package testing
 
 import (
 	"archive/zip"
@@ -171,6 +171,11 @@ func NewCharmMeta(meta *charm.Meta) *Charm {
 // Meta implements charm.Charm.Meta.
 func (ch *Charm) Meta() *charm.Meta {
 	return ch.meta
+}
+
+// Manifest implements charm.Charm.Manifest.
+func (ch *Charm) Manifest() *charm.Manifest {
+	return nil
 }
 
 // Config implements charm.Charm.Config.
