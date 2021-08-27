@@ -216,7 +216,7 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 
 // GetFileFromArchive streams the contents of the requested filename from the
 // given charm or bundle archive, returning a reader its data can be read from.
-func (c *Client) GetFileFromArchive(id *charm.URL, filename string) (r io.ReadCloser, err error) {
+func (c *Client) GetFileFromArchive(id *charm.URL, filename string) (io.ReadCloser, error) {
 	fail := func(err error) (io.ReadCloser, error) {
 		return nil, err
 	}
