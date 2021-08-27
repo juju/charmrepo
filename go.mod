@@ -8,7 +8,7 @@ require (
 	github.com/juju/errors v0.0.0-20200330140219-3fe23663418f
 	github.com/juju/loggo v0.0.0-20200526014432-9ce3a2e09b5e
 	github.com/juju/os v0.0.0-20191022170002-da411304426c // indirect
-	github.com/juju/testing v0.0.0-20210302031854-2c7ee8570c07
+	github.com/juju/testing v0.0.0-20210324180055-18c50b0c2098
 	github.com/juju/utils v0.0.0-20200116185830-d40c2fe10647
 	golang.org/x/net v0.0.0-20210226172049-e18ecbb05110
 	gopkg.in/check.v1 v1.0.0-20201130134442-10cb98267c6c
