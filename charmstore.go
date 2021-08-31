@@ -194,6 +194,20 @@ func (s *CharmStore) ResolveWithPreferredChannel(ref *charm.URL, channel params.
 	return result.Id.Id, channel, result.SupportedSeries.SupportedSeries, nil
 }
 
+// GetFileFromArchive streams the contents of the requested filename from the
+// given charm or bundle archive, returning a reader its data can be read from.
+func (s *CharmStore) GetFileFromArchive(charmURL *charm.URL, filename string) (io.ReadCloser, error) {
+	r, err := s.client.GetFileFromArchive(charmURL, filename)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, params.ErrNotFound
+		}
+		return nil, err
+	}
+
+	return r, err
+}
+
 // bestChannel determines the best channel to use for the given client
 // and published info.
 //
