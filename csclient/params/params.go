@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/juju/charm/v9"
-	"github.com/juju/utils/debugstatus"
 	"gopkg.in/macaroon.v2"
 )
 
@@ -196,7 +195,20 @@ type Published struct {
 // DebugStatus holds the result of the status checks.
 // This is defined for backward compatibility: new clients should use
 // debugstatus.CheckResult directly.
-type DebugStatus debugstatus.CheckResult
+type DebugStatus struct {
+	// Name is the human readable name for the check.
+	Name string
+
+	// Value is the check result.
+	Value string
+
+	// Passed reports whether the check passed.
+	Passed bool
+
+	// Duration holds the duration that the
+	// status check took to run.
+	Duration time.Duration
+}
 
 // EntityResult holds a the resolved entity ID along with any requested metadata.
 type EntityResult struct {
