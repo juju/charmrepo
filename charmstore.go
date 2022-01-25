@@ -194,6 +194,50 @@ func (s *CharmStore) ResolveWithPreferredChannel(ref *charm.URL, channel params.
 	return result.Id.Id, channel, result.SupportedSeries.SupportedSeries, nil
 }
 
+// GetFileFromArchive streams the contents of the requested filename from the
+// given charm or bundle archive, returning a reader its data can be read from.
+func (s *CharmStore) GetFileFromArchive(charmURL *charm.URL, filename string) (io.ReadCloser, error) {
+	r, err := s.client.GetFileFromArchive(charmURL, filename)
+	if err != nil {
+		if errgo.Cause(err) == params.ErrNotFound {
+			return nil, params.ErrNotFound
+		}
+		return nil, err
+	}
+
+	return r, err
+}
+
+// Meta fetches metadata on the charm or bundle with the
+// given id. The result value provides a value
+// to be filled in with the result, which must be
+// a pointer to a struct containing members corresponding
+// to possible metadata include parameters
+// (see https://github.com/juju/charmstore/blob/v4/docs/API.md#get-idmeta).
+//
+// It returns the fully qualified id of the entity.
+//
+// The name of the struct member is translated to
+// a lower case hyphen-separated form; for example,
+// ArchiveSize becomes "archive-size", and BundleMachineCount
+// becomes "bundle-machine-count", but may also
+// be specified in the field's tag
+//
+// This example will fill in the result structure with information
+// about the given id, including information on its archive
+// size (include archive-size), upload time (include archive-upload-time)
+// and digest (include extra-info/digest).
+//
+//	var result struct {
+//		ArchiveSize params.ArchiveSizeResponse
+//		ArchiveUploadTime params.ArchiveUploadTimeResponse
+//		Digest string `csclient:"extra-info/digest"`
+//	}
+//	id, err := client.Meta(id, &result)
+func (s *CharmStore) Meta(charmURL *charm.URL, result interface{}) (*charm.URL, error) {
+	return s.client.Meta(charmURL, result)
+}
+
 // bestChannel determines the best channel to use for the given client
 // and published info.
 //

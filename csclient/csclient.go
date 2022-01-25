@@ -214,6 +214,41 @@ func (c *Client) GetArchive(id *charm.URL) (r io.ReadCloser, eid *charm.URL, has
 	return resp.Body, eid, hash, resp.ContentLength, nil
 }
 
+// GetFileFromArchive streams the contents of the requested filename from the
+// given charm or bundle archive, returning a reader its data can be read from.
+func (c *Client) GetFileFromArchive(id *charm.URL, filename string) (io.ReadCloser, error) {
+	fail := func(err error) (io.ReadCloser, error) {
+		return nil, err
+	}
+
+	// Create the request.
+	req, err := http.NewRequest("GET", "", nil)
+	if err != nil {
+		return fail(errgo.Notef(err, "cannot make new request"))
+	}
+
+	// Send the request.
+	v := url.Values{}
+	if c.statsDisabled {
+		v.Set("stats", "0")
+	}
+	u := url.URL{
+		Path:     "/" + id.Path() + "/archive/" + filename,
+		RawQuery: v.Encode(),
+	}
+	resp, err := c.Do(req, u.String())
+	if err != nil {
+		terr := params.MaybeTermsAgreementError(err)
+		if err1, ok := errgo.Cause(terr).(*params.TermAgreementRequiredError); ok {
+			terms := strings.Join(err1.Terms, " ")
+			return fail(errgo.Newf(`cannot get file from archive because some terms have not been agreed to. Try "juju agree %s"`, terms))
+		}
+		return fail(errgo.NoteMask(err, "cannot get file from archive", isAPIError))
+	}
+
+	return resp.Body, nil
+}
+
 // ListResources retrieves the metadata about resources for the given charms.
 // It returns a slice with an element for each of the given ids, holding the
 // resources for the respective id.
