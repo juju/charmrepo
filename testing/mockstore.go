@@ -15,7 +15,7 @@ import (
 
 	"github.com/juju/charm/v9"
 	"github.com/juju/loggo"
-	"github.com/juju/utils"
+	"github.com/juju/utils/v3"
 	gc "gopkg.in/check.v1"
 
 	"github.com/juju/charmrepo/v7"
