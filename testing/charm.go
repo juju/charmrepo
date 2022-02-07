@@ -10,7 +10,7 @@ import (
 	"runtime"
 
 	"github.com/juju/charm/v9"
-	"github.com/juju/utils/fs"
+	"github.com/juju/utils/v3/fs"
 )
 
 func check(err error) {
