@@ -26,8 +26,10 @@ require (
 	github.com/juju/gojsonreference v0.0.0-20150204194633-f0d24ac5ee33 // indirect
 	github.com/juju/gojsonschema v1.0.0 // indirect
 	github.com/juju/mgo/v2 v2.0.2 // indirect
+	github.com/juju/mgo/v3 v3.0.2 // indirect
 	github.com/juju/names/v4 v4.0.0 // indirect
 	github.com/juju/os/v2 v2.2.3 // indirect
+	github.com/juju/retry v1.0.0 // indirect
 	github.com/juju/schema v1.0.1 // indirect
 	github.com/juju/version/v2 v2.0.0 // indirect
 	github.com/juju/webbrowser v1.0.0 // indirect
@@ -38,9 +40,11 @@ require (
 	github.com/rogpeppe/fastuuid v1.2.0 // indirect
 	github.com/rogpeppe/go-internal v1.8.1 // indirect
 	github.com/stretchr/testify v1.7.0 // indirect
+	github.com/xdg-go/stringprep v1.0.3 // indirect
 	golang.org/x/crypto v0.0.0-20220722155217-630584e8d5aa // indirect
 	golang.org/x/net v0.0.0-20220725212005-46097bf591d3 // indirect
 	golang.org/x/sys v0.0.0-20220722155257-8c9f86f7a55f // indirect
+	golang.org/x/text v0.3.7 // indirect
 	golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1 // indirect
 	google.golang.org/protobuf v1.28.0 // indirect
 	gopkg.in/gobwas/glob.v0 v0.2.3 // indirect
