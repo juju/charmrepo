@@ -4,13 +4,14 @@
 package testing // import "github.com/juju/charmrepo/v6/testing"
 
 import (
+	mgotesting "github.com/juju/mgo/v2/testing"
 	jujutesting "github.com/juju/testing"
 	gc "gopkg.in/check.v1"
 )
 
 type IsolatedMgoSuite struct {
 	jujutesting.IsolationSuite
-	jujutesting.MgoSuite
+	mgotesting.MgoSuite
 }
 
 func (s *IsolatedMgoSuite) SetUpSuite(c *gc.C) {

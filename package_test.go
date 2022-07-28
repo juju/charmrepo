@@ -6,9 +6,9 @@ package charmrepo_test // import "github.com/juju/charmrepo/v6"
 import (
 	"testing"
 
-	jujutesting "github.com/juju/testing"
+	mgotesting "github.com/juju/mgo/v2/testing"
 )
 
 func TestPackage(t *testing.T) {
-	jujutesting.MgoTestPackage(t, nil)
+	mgotesting.MgoTestPackage(t, nil)
 }
