@@ -106,7 +106,7 @@ func newCharm(spec CharmSpec) *Charm {
 		})
 	}
 	if spec.Actions != "" {
-		ch.actions, err = charm.ReadActionsYaml(strings.NewReader(spec.Actions))
+		ch.actions, err = charm.ReadActionsYaml(ch.meta.Name, strings.NewReader(spec.Actions))
 		if err != nil {
 			panic(err)
 		}
@@ -294,7 +294,9 @@ func MetaWithSupportedSeries(m *charm.Meta, series ...string) *charm.Meta {
 // to the given relations, where each relation
 // is specified as a white-space-separated
 // triple:
+//
 //	role name interface
+//
 // where role specifies the role of the interface
 // ("provides" or "requires"), name holds the relation
 // name and interface holds the interface relation type.
