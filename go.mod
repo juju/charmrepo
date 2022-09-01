@@ -1,6 +1,6 @@
 module github.com/juju/charmrepo/v6
 
-go 1.17
+go 1.19
 
 require (
 	github.com/go-macaroon-bakery/macaroon-bakery/v3 v3.0.0-20220204130128-afeebcc9521d
